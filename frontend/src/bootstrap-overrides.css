@@ -1,0 +1,134 @@
+/* Just a few custom styles we still need */
+.asset-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: #e6f7ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+}
+
+.chat-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.chat-card .card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.chat-messages {
+    height: 60vh;
+    max-height: 60vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.message {
+    max-width: 85%;
+    padding: 10px 15px;
+    border-radius: 10px;
+    margin-bottom: 0.5rem;
+}
+
+.message:last-of-type {
+    margin-bottom: 0.25rem;
+}
+
+.message-content > p:last-child {
+    margin-bottom: 0;
+}
+
+.message.user {
+    align-self: flex-end;
+    background-color: #198754;
+    color: white;
+    margin-left: auto;
+}
+
+.message.agent {
+    align-self: flex-start;
+    background-color: #f0f2f5;
+    color: #333;
+}
+
+.message.tool {
+    align-self: flex-start;
+    background-color: #e6f7ff;
+    color: #333;
+    border-left: 3px solid #34a853;
+}
+
+.message.system, .message.error {
+    align-self: center;
+    width: 90%;
+    text-align: center;
+}
+
+.message.system {
+    background-color: #f9f9f9;
+    color: #666;
+    border: 1px solid #eee;
+}
+
+.message.error {
+    background-color: #fff2f0;
+    color: #dc3545;
+    border: 1px solid #ffccc7;
+}
+
+.message.thinking {
+    align-self: flex-start;
+    background-color: #f0f2f5;
+    color: #999;
+    font-style: italic;
+}
+
+.message.signature_pending {
+    align-self: flex-start;
+    background-color: #f0f2f5;
+    color: #666;
+    font-style: italic;
+    border-left: 3px solid #fd7e14;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+}
+
+.connection-status {
+    font-size: 12px;
+}
+
+.connection-status.connected {
+    color: #198754;
+}
+
+.connection-status.connecting {
+    color: #fd7e14;
+}
+
+.connection-status.disconnected {
+    color: #dc3545;
+}
+
+/* Message content styling */
+.message.user * {
+    color: white;
+}
+
+@media (max-width: 991.98px) {
+    .chat-messages {
+        height: 50vh;
+    }
+} 

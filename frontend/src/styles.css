@@ -1,0 +1,544 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+html {
+    font-size: 16px; /* Base font size for responsive typography */
+}
+
+body {
+    background-color: #f5f5f5;
+    min-height: 100vh;
+}
+
+/* Main layout container */
+.app-container {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header styles */
+.app-header {
+    background-color: #008000;
+    color: white;
+    padding: 0; /* Remove padding from container, put it in content */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    position: sticky; /* Make header sticky for better mobile UX */
+    top: 0;
+    z-index: 100;
+}
+
+.header-content {
+    max-width: 1800px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    flex-wrap: wrap; /* Allow wrapping on narrow screens */
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    flex-wrap: wrap; /* Allow nav to wrap */
+}
+
+.header-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.header-nav {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.header-nav a {
+    color: white;
+    text-decoration: none;
+    padding: 0.5rem 0;
+    border-bottom: 2px solid transparent;
+    transition: border-color 0.2s;
+    font-size: 1rem;
+}
+
+.header-nav a:hover {
+    border-bottom-color: white;
+}
+
+/* Main content area */
+.main-content {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    background-color: #f5f5f5;
+    max-width: 1800px;
+    margin: 0 auto;
+    padding: 2rem;
+    flex-wrap: wrap; /* Allow columns to wrap naturally */
+}
+
+/* Chat container modifications */
+.chat-container {
+    flex: 1; /* Use flex instead of fixed width for better responsiveness */
+    min-width: 300px; /* Ensure minimum usable width */
+    height: 80vh; /* Height for desktop */
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Remove the old chat-header background as it's now in the main header */
+.chat-header {
+    padding: 20px;
+    background-color: transparent;
+    border-bottom: 1px solid #eee;
+}
+
+.chat-header h1 {
+    font-size: 1.5rem;
+    margin-bottom: 5px;
+}
+
+.chat-header p {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+.chat-messages {
+    flex: 1;
+    padding: 1.25rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.message {
+    max-width: 85%;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    line-height: 1.4;
+    position: relative;
+    word-break: break-word; /* Prevent overflow of long words */
+}
+
+.message.user {
+    align-self: flex-end;
+    background-color: #008000;
+    color: white;
+}
+
+.message.agent {
+    align-self: flex-start;
+    background-color: #f0f2f5;
+    color: #333;
+}
+
+.message.tool {
+    align-self: flex-start;
+    background-color: #e6f7ff;
+    color: #333;
+    border-left: 3px solid #34a853;
+}
+
+.message.system {
+    align-self: center;
+    background-color: #f9f9f9;
+    color: #666;
+    width: 90%;
+    text-align: center;
+    border: 1px solid #eee;
+}
+
+.message.error {
+    align-self: center;
+    background-color: #fff2f0;
+    color: #ff4d4f;
+    border: 1px solid #ffccc7;
+    width: 90%;
+}
+
+.message.thinking {
+    align-self: flex-start;
+    background-color: #f0f2f5;
+    color: #999;
+    font-style: italic;
+}
+
+.message.tool_call {
+    align-self: flex-start;
+    background-color: #f0f7ff;
+    color: #333;
+    border-left: 3px solid #34a853;
+}
+
+.message-content {
+    word-wrap: break-word;
+}
+
+.message-content ul {
+    margin-left: 20px;
+    margin-top: 10px;
+}
+
+.message-content li {
+    margin-bottom: 5px;
+}
+
+.chat-input-container {
+    display: flex;
+    padding: 1rem;
+    border-top: 1px solid #eee;
+    background-color: white;
+    flex-wrap: wrap; /* Allow wrapping on very small screens */
+    gap: 0.5rem;
+}
+
+.chat-input-container textarea {
+    flex: 1;
+    padding: 0.875rem;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    resize: none;
+    font-size: 1rem;
+    min-height: 2.5rem; /* Minimum height for textarea */
+    min-width: 200px; /* Prevent it from getting too narrow */
+}
+
+.chat-input-container button {
+    padding: 0.875rem 1.25rem;
+    background-color: #008000;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 1rem;
+    min-width: 5rem; /* Ensure button has enough touch area */
+    min-height: 2.875rem;
+}
+
+.chat-input-container button:hover {
+    background-color: #006600;
+}
+
+.chat-input-container button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+.connection-status {
+    padding: 8px;
+    text-align: center;
+    font-size: 12px;
+    color: #666;
+    background-color: #f9f9f9;
+    border-top: 1px solid #eee;
+}
+
+.connected {
+    color: #52c41a;
+}
+
+.disconnected {
+    color: #ff4d4f;
+}
+
+.connecting {
+    color: #faad14;
+}
+
+/* Code block styling */
+pre {
+    background-color: #f6f8fa;
+    border-radius: 5px;
+    padding: 10px;
+    overflow-x: auto;
+    margin: 10px 0;
+}
+
+code {
+    font-family: 'Courier New', Courier, monospace;
+}
+
+/* Enhanced Responsive Adjustments */
+/* Mobile phones */
+@media (max-width: 600px) {
+    html {
+        font-size: 14px; /* Slightly smaller base font size */
+    }
+    
+    .header-content,
+    .footer-content,
+    .main-content {
+        padding: 1rem;
+    }
+    
+    .header-content {
+        justify-content: center;
+        text-align: center;
+    }
+    
+    .header-left {
+        flex-direction: column;
+        gap: 0.5rem;
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+    
+    .header-nav {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .wallet-connect-container {
+        width: 100%;
+        justify-content: center;
+        /* Scale up the connect button for easier tapping */
+        transform: scale(1.1);
+    }
+    
+    .message {
+        max-width: 90%;
+    }
+    
+    .chat-input-container {
+        flex-direction: column;
+    }
+    
+    .chat-input-container button {
+        width: 100%;
+        padding: 0.75rem;
+    }
+    
+    .asset-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .asset-value {
+        width: 100%;
+        text-align: left;
+        margin-top: 0.5rem;
+    }
+}
+
+/* Tablets */
+@media (min-width: 601px) and (max-width: 900px) {
+    .main-content {
+        padding: 1.5rem;
+    }
+    
+    .message {
+        max-width: 85%;
+    }
+}
+
+/* Smaller desktops and tablets in landscape */
+@media (max-width: 1200px) {
+    .header-content,
+    .main-content,
+    .footer-content {
+        max-width: 100%;
+    }
+    
+    .main-content {
+        flex-direction: column;
+    }
+    
+    .chat-container,
+    .account-overview {
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        min-height: 50vh; /* Adjust height for better mobile view */
+        margin-bottom: 1.5rem; /* Add space between components */
+    }
+    
+    .account-overview {
+        margin-bottom: 0;
+    }
+}
+
+/* Very large screens */
+@media (min-width: 1800px) {
+    html {
+        font-size: 18px; /* Larger base font for big screens */
+    }
+}
+
+/* Fix for white text in user messages with markdown */
+.message.user * {
+    color: white;
+}
+
+.wallet-connect-container {
+    display: flex;
+    justify-content: flex-end;
+    margin: 0.5rem 0;
+    /* Make wallet connect button more visible on mobile */
+    transform: scale(1);
+}
+
+.wallet-connect-prompt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    padding: 40px;
+    text-align: center;
+}
+
+.wallet-connect-prompt h2 {
+    margin-bottom: 16px;
+    color: #333;
+}
+
+.wallet-connect-prompt p {
+    color: #666;
+    margin-bottom: 30px;
+    max-width: 500px;
+    line-height: 1.5;
+}
+
+/* Account Overview Panel Styles */
+.account-overview {
+    flex: 1; /* Use flex instead of fixed width */
+    min-width: 300px; /* Ensure minimum usable width */
+    max-height: 80vh; /* Height for desktop */
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    overflow-y: auto;
+}
+
+.overview-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.overview-section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #333;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.overview-card {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.overview-metric {
+    margin-bottom: 0.5rem;
+}
+
+.metric-label {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 0.25rem;
+}
+
+.metric-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.metric-change {
+    font-size: 0.9rem;
+    margin-left: 0.5rem;
+}
+
+.metric-change.positive {
+    color: #52c41a;
+}
+
+.metric-change.negative {
+    color: #ff4d4f;
+}
+
+.asset-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.asset-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    flex-wrap: wrap; /* Allow wrapping on very narrow screens */
+    gap: 0.5rem;
+}
+
+.asset-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 120px; /* Prevent squeezing too much */
+}
+
+.asset-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background-color: #e6f7ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+}
+
+.asset-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.asset-name {
+    font-weight: 500;
+    color: #333;
+}
+
+.asset-apy {
+    font-size: 0.8rem;
+    color: #666;
+}
+
+.asset-value {
+    text-align: right;
+}
+
+.asset-amount {
+    font-weight: 500;
+    color: #333;
+}
+
+.asset-yield {
+    font-size: 0.8rem;
+    color: #52c41a;
+} 
