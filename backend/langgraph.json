@@ -1,0 +1,21 @@
+{
+    "dockerfile_lines": [
+      ""
+    ],
+    "graphs": {
+      "agent": "./compound_assistant/agent.py:create_agent"
+    },
+    "env": ".env",
+    "python_version": "3.11",
+    "dependencies": [
+      "python-dotenv",
+      "langchain-openai",
+      "langgraph",
+      "ed25519-blake2b",
+      "coinbase-agentkit",
+      "coinbase-agentkit-langchain",
+      "fastapi",
+      "uvicorn",
+      "websockets"
+    ]
+}

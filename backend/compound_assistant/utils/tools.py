@@ -1,0 +1,87 @@
+"""Tool definitions for the Compound Assistant."""
+
+import json
+import os
+
+from eth_account import Account
+
+from coinbase_agentkit import (
+    AgentKit,
+    AgentKitConfig,
+    EthAccountWalletProvider,
+    EthAccountWalletProviderConfig,
+    compound_action_provider,
+    erc20_action_provider,
+    wallet_action_provider,
+    weth_action_provider,
+)
+from coinbase_agentkit_langchain import get_langchain_tools
+
+def initialize_agentkit():
+    """
+    Initialize the EVM Wallet Provider and AgentKit.
+    Returns the AgentKit instance and the wallet provider.
+    """
+    # Load the private key from the environment variable.
+    private_key = os.environ.get("PRIVATE_KEY")
+    assert private_key is not None, "You must set PRIVATE_KEY environment variable"
+    assert private_key.startswith("0x"), "Private key must start with 0x hex prefix"
+
+    account = Account.from_key(private_key)
+    
+    wallet_provider = EthAccountWalletProvider(
+        config=EthAccountWalletProviderConfig(
+            account=account,
+            chain_id="84532",
+        )
+    )
+    
+    # Initialize AgentKit with all required action providers.
+    agentkit = AgentKit(AgentKitConfig(
+        wallet_provider=wallet_provider,
+        action_providers=[
+            compound_action_provider(),
+            erc20_action_provider(),
+            wallet_action_provider(),
+            weth_action_provider(),
+        ]
+    ))
+    
+    return agentkit, wallet_provider
+
+def get_tools():
+    """
+    Get the LangChain tools from AgentKit and add a Python interpreter tool
+    so the agent can perform Python analysis.
+    """
+    agentkit, _ = initialize_agentkit()
+    tools = get_langchain_tools(agentkit)
+
+    try:
+        # If available, use LangChain's built-in Python interpreter tool.
+        from langchain.tools.python.tool import PythonREPLTool
+        python_interpreter_tool = PythonREPLTool()
+    except ImportError:
+        # Fallback: define a basic Python interpreter tool.
+        from langchain.tools import Tool
+
+        def python_interpreter(code: str) -> str:
+            try:
+                # Try evaluation in an empty namespace.
+                result = eval(code, {}, {})
+                return str(result)
+            except Exception:
+                try:
+                    exec(code, globals(), locals())
+                    return "Code executed."
+                except Exception as e:
+                    return f"Error: {str(e)}"
+        
+        python_interpreter_tool = Tool(
+            name="python_interpreter",
+            func=python_interpreter,
+            description="Executes Python code for dynamic analysis. Use with caution!"
+        )
+        
+    tools.append(python_interpreter_tool)
+    return tools 
