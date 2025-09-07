@@ -1,0 +1,1508 @@
+---
+description: When writing Solidity Foundry Tests follow these coding standards
+globs:
+---
+
+* **Structure Tests as Specification Units:** Organize your test suite by treating each test contract as a “describe block” for a specific function or feature. For example, if testing a `Token` contract, you might have a test contract `contract Transfer` containing all tests for the `transfer()` function, another `contract Approve` for `approve()`, etc. This makes the test suite easy to navigate and aligns with ScopeLift’s convention of using contracts to group test cases by functionality.
+* **Leverage the Deployment Script in Tests:** Have your test contracts inherit from the main deploy script and call its `run()` in the `setUp()` function. ScopeLift’s template uses a `Deploy.sol` script that deploys all core contracts and stores their addresses; by calling `Deploy.run()` in each test’s setup, you ensure every test runs against the exact environment produced by your deployment script. This guarantees that your deployment procedures are also implicitly tested, and that all tests use a consistent initial state.
+* **Follow ScopeLift’s Test Naming Convention:** Name test functions clearly and consistently. Every test function should start with `test` (and optional tags like `Fork` or `Fuzz` if it’s a forked network test or a fuzz test) followed by an underscore and a description. Use `RevertIf_...` or `RevertWhen_...` in the name for tests that expect reverts under certain conditions. For example: `function test_RevertIf_NotOwner()` to specify a permission failure, or `function test_transfer_UpdatesBalances()` for a successful outcome. This naming scheme makes test intentions explicit and is enforced by ScopeLift’s linters (e.g., Scopelint).
+* **Write Thorough and Granular Tests:** Each test function should generally cover one specific scenario or requirement. ScopeLift engineers write many small, focused tests (instead of one monolithic test) to act as a specification for the contract. For example, for a token’s `transfer()` you’d have separate tests to check that it **decreases the sender’s balance**, **increases the recipient’s balance**, **does not change total supply**, **emits a Transfer event**, and **reverts if the sender’s balance is insufficient**, each with its own descriptive name. This granularity ensures that the **test suite documents the contract’s behavior** and can be used to auto-generate specs.
+* **Use Forge Std Library & Cheatcodes:** Utilize Foundry’s `forge-std` library in tests by inheriting from `Test` (or using the provided `vm` cheatcode interface) to gain access to utilities like `vm.prank`, `vm.expectRevert`, `assertEq`, etc. Use `vm.prank`/`startPrank` to simulate calls from different addresses, `vm.expectRevert` (with custom error string or error type) to assert failure cases, and `hoax` to combine funding an address with a prank. ScopeLift’s test style relies on these cheat codes to create robust and precise test scenarios, such as simulating time (e.g. `vm.warp` to change block timestamp) or mining blocks (`vm.roll`). Ensure each test makes appropriate use of setup from `setUp()` and uses assertions for all relevant effects (state changes, events, return values).
+* **Include Fuzz and Property Tests:** Where applicable, include fuzz tests by adding functions with the `testFuzz_` prefix to automatically generate random inputs and test invariants. For critical properties (e.g. mathematical invariants or cross-function consistency), ScopeLift engineers also include invariant tests (functions marked with `targetContract` or using Forge’s invariant testing framework) to run persistent property-based tests. This helps catch edge cases and demonstrates extra assurance in the system’s reliability.
+
+## Test Writting Examples
+These are examples of how the smart contract test should be written for example contracts.
+
+Make note of the following features of the test:
+- You need to make 1 `contract` for each of the functions in the contract you are testing.
+- Within that test contract for each function, you need to individually test:
+  - State changes
+  - Every possible branch of the function
+  - Every possible error case
+  - Every possible event
+
+### Example 1: QueryStakerFactory Contract
+
+```solidity
+// SPDX-License-Identifier: Apache-2.0
+pragma solidity 0.8.26;
+
+import {Test, console2} from "forge-std/Test.sol";
+import {QueryStakerFactory} from "src/QueryStakerFactory.sol";
+import {QueryStakingPool} from "src/QueryStakingPool.sol";
+import {VmSafe} from "forge-std/Vm.sol";
+
+contract QueryStakerFactoryTest is Test {
+  QueryStakerFactory public factory;
+  address public owner;
+  address public stakingToken;
+  uint8 public queryType;
+
+  function setUp() public virtual {
+    owner = makeAddr("owner");
+    stakingToken = makeAddr("stakingToken");
+    vm.prank(owner);
+    factory = new QueryStakerFactory(owner, stakingToken);
+    queryType = 1;
+  }
+
+  function _createPool() internal returns (address) {
+    vm.prank(owner);
+    return factory.createStakingPool(queryType, owner, bytes32(0));
+  }
+}
+
+contract Constructor is QueryStakerFactoryTest {
+  function testFuzz_SetsOwnerAndWTokenCorrectly(address _owner, address _stakingToken) public {
+    vm.assume(_owner != address(0) && _stakingToken != address(0));
+    vm.prank(_owner);
+    QueryStakerFactory newFactory = new QueryStakerFactory(_owner, _stakingToken);
+    assertEq(newFactory.owner(), _owner);
+    assertEq(address(newFactory.STAKING_TOKEN()), _stakingToken);
+  }
+
+  function testFuzz_RevertIf_StakingTokenAddressIsZero(address _owner) public {
+    vm.assume(_owner != address(0));
+    vm.prank(_owner);
+    vm.expectRevert(QueryStakerFactory.InvalidTokenAddress.selector);
+    new QueryStakerFactory(_owner, address(0));
+  }
+}
+
+contract CreateStakingPool is QueryStakerFactoryTest {
+  function testFuzz_CreatesNewStakingPoolWithArbitraryQuery(
+    uint8 _queryType,
+    address _poolOwner,
+    bytes32 _initialEntry
+  ) public {
+    vm.assume(_poolOwner != address(0));
+    vm.prank(owner);
+    address poolAddress = factory.createStakingPool(_queryType, _poolOwner, _initialEntry);
+
+    assertTrue(poolAddress != address(0));
+    assertEq(factory.queryTypePools(_queryType), poolAddress);
+    assertEq(QueryStakingPool(poolAddress).owner(), _poolOwner);
+  }
+
+  function testFuzz_EmitsCreateQueryStakingPoolEventWithArbitraryQuery(
+    uint8 _queryType,
+    address _poolOwner,
+    bytes32 _initialEntry
+  ) public {
+    vm.assume(_poolOwner != address(0));
+    vm.recordLogs();
+    vm.prank(owner);
+    address poolAddress = factory.createStakingPool(_queryType, _poolOwner, _initialEntry);
+
+    VmSafe.Log[] memory entries = vm.getRecordedLogs();
+    assertEq(entries[2].topics[0], keccak256("CreateQueryStakingPool(uint8,address)"));
+    assertEq(entries[2].topics[1], bytes32(uint256(_queryType))); // queryType
+    assertEq(entries[2].topics[2], bytes32(uint256(uint160(poolAddress)))); // poolAddress
+  }
+
+  function testFuzz_RevertIf_CallerIsNotOwner(
+    address _notOwner,
+    address _poolOwner,
+    bytes32 _initialEntry
+  ) public {
+    vm.assume(_notOwner != owner && _notOwner != address(0));
+    vm.assume(_poolOwner != address(0));
+
+    vm.prank(_notOwner);
+    vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", _notOwner));
+    factory.createStakingPool(queryType, _poolOwner, _initialEntry);
+  }
+
+  function testFuzz_RevertIf_PoolAlreadyExistsWithArbitraryQuery(
+    uint8 _queryType,
+    address _poolOwner,
+    bytes32 _initialEntry
+  ) public {
+    vm.assume(_poolOwner != address(0));
+    vm.startPrank(owner);
+    factory.createStakingPool(_queryType, _poolOwner, _initialEntry);
+
+    vm.expectRevert(QueryStakerFactory.PoolExists.selector);
+    factory.createStakingPool(_queryType, _poolOwner, _initialEntry);
+    vm.stopPrank();
+  }
+}
+```
+
+### Example 2: Base Test Contract to help with testing the Staker Contract
+
+```solidity
+// SPDX-License-Identifier: AGPL-3.0-only
+pragma solidity ^0.8.23;
+
+import {Vm, Test, stdStorage, StdStorage, console2, stdError} from "forge-std/Test.sol";
+import {Staker} from "../src/Staker.sol";
+import {DelegationSurrogate} from "../src/DelegationSurrogate.sol";
+import {ERC20VotesMock} from "./mocks/MockERC20Votes.sol";
+import {ERC20Fake} from "./fakes/ERC20Fake.sol";
+import {MockFullEarningPowerCalculator} from "./mocks/MockFullEarningPowerCalculator.sol";
+import {PercentAssertions} from "./helpers/PercentAssertions.sol";
+
+// Base utilities that can be used for testing concrete Staker implementations. Steps:
+// 1. Create a test file that inherits from StakerTestBase
+// 2. Implement the virtual `_deployStaker` method which returns an instance of your concrete
+//    staker.
+// 3. Override the `setUp` method, call `super.setUp`, then do any other set up for your tests as
+//    needed.
+// 4. Write your tests, taking advantage of the helpers provided by this base.
+abstract contract StakerTestBase is Test, PercentAssertions {
+  ERC20Fake rewardToken;
+  ERC20VotesMock govToken;
+  MockFullEarningPowerCalculator earningPowerCalculator;
+
+  address admin;
+  address rewardNotifier;
+  Staker baseStaker;
+  uint256 SCALE_FACTOR;
+  uint256 maxBumpTip = 1e18;
+
+  mapping(DelegationSurrogate surrogate => bool isKnown) isKnownSurrogate;
+  mapping(address depositor => bool isKnown) isKnownDepositor;
+
+  function _deployStaker() public virtual returns (Staker _staker);
+
+  function setUp() public virtual {
+    // Set the block timestamp to an arbitrary value to avoid introducing assumptions into tests
+    // based on a starting timestamp of 0, which is the default.
+    _jumpAhead(1234);
+
+    rewardToken = new ERC20Fake();
+    vm.label(address(rewardToken), "Reward Token");
+
+    govToken = new ERC20VotesMock();
+    vm.label(address(govToken), "Governance Token");
+
+    rewardNotifier = address(0xaffab1ebeef);
+    vm.label(rewardNotifier, "Reward Notifier");
+
+    earningPowerCalculator = new MockFullEarningPowerCalculator();
+    vm.label(address(earningPowerCalculator), "Full Earning Power Calculator");
+
+    admin = makeAddr("admin");
+
+    baseStaker = _deployStaker();
+    vm.label(address(baseStaker), "GovStaker");
+
+    vm.prank(admin);
+    baseStaker.setRewardNotifier(rewardNotifier, true);
+
+    // Convenience for use in tests
+    SCALE_FACTOR = baseStaker.SCALE_FACTOR();
+  }
+
+  function _min(uint256 _leftValue, uint256 _rightValue) internal pure returns (uint256) {
+    return _leftValue > _rightValue ? _rightValue : _leftValue;
+  }
+
+  function _jumpAhead(uint256 _seconds) public {
+    vm.warp(block.timestamp + _seconds);
+  }
+
+  function _boundMintAmount(uint256 _amount) internal pure returns (uint256) {
+    return bound(_amount, 0, 100_000_000e18);
+  }
+
+  function _mintGovToken(address _to, uint256 _amount) internal {
+    vm.assume(_to != address(0));
+    govToken.mint(_to, _amount);
+  }
+
+  function _boundToRealisticStake(uint256 _stakeAmount)
+    public
+    pure
+    returns (uint256 _boundedStakeAmount)
+  {
+    _boundedStakeAmount = bound(_stakeAmount, 0.1e18, 25_000_000e18);
+  }
+
+  // Remember each depositor and surrogate (as they're deployed) and ensure that there is
+  // no overlap between them. This is to prevent the fuzzer from selecting a surrogate as a
+  // depositor or vice versa.
+  function _assumeSafeDepositorAndSurrogate(address _depositor, address _delegatee) internal {
+    DelegationSurrogate _surrogate = baseStaker.surrogates(_delegatee);
+    isKnownDepositor[_depositor] = true;
+    isKnownSurrogate[_surrogate] = true;
+
+    vm.assume(
+      (!isKnownSurrogate[DelegationSurrogate(_depositor)])
+        && (!isKnownDepositor[address(_surrogate)])
+    );
+  }
+
+  function _setClaimFeeAndCollector(uint96 _amount, address _collector) internal {
+    Staker.ClaimFeeParameters memory _params =
+      Staker.ClaimFeeParameters({feeAmount: _amount, feeCollector: _collector});
+
+    vm.prank(admin);
+    baseStaker.setClaimFeeParameters(_params);
+  }
+
+  function _stake(address _depositor, uint256 _amount, address _delegatee)
+    internal
+    returns (Staker.DepositIdentifier _depositId)
+  {
+    vm.assume(_delegatee != address(0));
+
+    vm.startPrank(_depositor);
+    govToken.approve(address(baseStaker), _amount);
+    _depositId = baseStaker.stake(_amount, _delegatee);
+    vm.stopPrank();
+
+    // Called after the stake so the surrogate will exist
+    _assumeSafeDepositorAndSurrogate(_depositor, _delegatee);
+  }
+
+  function _stake(address _depositor, uint256 _amount, address _delegatee, address _claimer)
+    internal
+    returns (Staker.DepositIdentifier _depositId)
+  {
+    vm.assume(_delegatee != address(0) && _claimer != address(0));
+
+    vm.startPrank(_depositor);
+    govToken.approve(address(baseStaker), _amount);
+    _depositId = baseStaker.stake(_amount, _delegatee, _claimer);
+    vm.stopPrank();
+
+    // Called after the stake so the surrogate will exist
+    _assumeSafeDepositorAndSurrogate(_depositor, _delegatee);
+  }
+
+  function _fetchDeposit(Staker.DepositIdentifier _depositId)
+    internal
+    view
+    returns (Staker.Deposit memory)
+  {
+    (
+      uint96 _balance,
+      address _owner,
+      uint96 _earningPower,
+      address _delegatee,
+      address _claimer,
+      uint256 _rewardPerTokenCheckpoint,
+      uint256 _scaledUnclaimedRewardCheckpoint
+    ) = baseStaker.deposits(_depositId);
+    return Staker.Deposit({
+      balance: _balance,
+      owner: _owner,
+      delegatee: _delegatee,
+      claimer: _claimer,
+      earningPower: _earningPower,
+      rewardPerTokenCheckpoint: _rewardPerTokenCheckpoint,
+      scaledUnclaimedRewardCheckpoint: _scaledUnclaimedRewardCheckpoint
+    });
+  }
+
+  function _boundMintAndStake(address _depositor, uint256 _amount, address _delegatee)
+    internal
+    returns (uint256 _boundedAmount, Staker.DepositIdentifier _depositId)
+  {
+    _boundedAmount = _boundMintAmount(_amount);
+    _mintGovToken(_depositor, _boundedAmount);
+    _depositId = _stake(_depositor, _boundedAmount, _delegatee);
+  }
+
+  function _boundMintAndStake(
+    address _depositor,
+    uint256 _amount,
+    address _delegatee,
+    address _claimer
+  ) internal returns (uint256 _boundedAmount, Staker.DepositIdentifier _depositId) {
+    _boundedAmount = _boundMintAmount(_amount);
+    _mintGovToken(_depositor, _boundedAmount);
+    _depositId = _stake(_depositor, _boundedAmount, _delegatee, _claimer);
+  }
+
+  // Scales first param and divides it by second
+  function _scaledDiv(uint256 _x, uint256 _y) public view returns (uint256) {
+    return (_x * SCALE_FACTOR) / _y;
+  }
+}
+```
+
+### Example 3: StakerCapDepositsTest Contract using StakerTestBase
+
+Here is an example using the StakerTestBase to test the StakerCapDeposits contract.
+```solidity
+// SPDX-License-Identifier: AGPL-3.0-only
+pragma solidity ^0.8.23;
+
+import {Vm, Test, stdStorage, StdStorage, console2, stdError} from "forge-std/Test.sol";
+import {StakerTestBase} from "./StakerTestBase.sol";
+import {StakerHarnessCapDeposits} from "./harnesses/StakerHarnessCapDeposits.sol";
+import {Staker} from "../src/Staker.sol";
+import {StakerCapDeposits} from "../src/extensions/StakerCapDeposits.sol";
+import {DelegationSurrogate} from "../src/DelegationSurrogate.sol";
+
+contract StakerCapDepositsTest is StakerTestBase {
+  StakerHarnessCapDeposits govStaker;
+  uint256 initialTotalStakeCap = 1_000_000e18;
+
+  function _deployStaker() public virtual override(StakerTestBase) returns (Staker _staker) {
+    return new StakerHarnessCapDeposits(
+      rewardToken,
+      govToken,
+      earningPowerCalculator,
+      maxBumpTip,
+      admin,
+      "Staker",
+      initialTotalStakeCap
+    );
+  }
+
+  function setUp() public virtual override(StakerTestBase) {
+    StakerTestBase.setUp();
+
+    govStaker = StakerHarnessCapDeposits(address(baseStaker));
+  }
+}
+
+contract Constructor is StakerCapDepositsTest {
+  function test_SetsTheInitialTotalStakeCap() public view {
+    assertEq(govStaker.totalStakeCap(), initialTotalStakeCap);
+  }
+
+  function testFuzz_SetsTheInitialTotalStakeCapToArbitraryValues(uint256 _initialTotalStakeCap)
+    public
+  {
+    StakerHarnessCapDeposits _govStaker = new StakerHarnessCapDeposits(
+      rewardToken,
+      govToken,
+      earningPowerCalculator,
+      maxBumpTip,
+      admin,
+      "Staker",
+      _initialTotalStakeCap
+    );
+    assertEq(_govStaker.totalStakeCap(), _initialTotalStakeCap);
+  }
+
+  function testFuzz_EmitsATotalStakeCapSetEvent(uint256 _initialTotalStakeCap) public {
+    vm.expectEmit();
+    emit StakerCapDeposits.TotalStakeCapSet(0, _initialTotalStakeCap);
+    new StakerHarnessCapDeposits(
+      rewardToken,
+      govToken,
+      earningPowerCalculator,
+      maxBumpTip,
+      admin,
+      "Staker",
+      _initialTotalStakeCap
+    );
+  }
+}
+
+contract SetTotalStakeCap is StakerCapDepositsTest {
+  function testFuzz_UpdatesTheTotalStakeCap(uint256 _newTotalStakeCap) public {
+    vm.prank(admin);
+    govStaker.setTotalStakeCap(_newTotalStakeCap);
+
+    assertEq(govStaker.totalStakeCap(), _newTotalStakeCap);
+  }
+
+  function testFuzz_EmitsATotalStakeCapSetEvent(uint256 _newTotalStakeCap) public {
+    vm.prank(admin);
+    vm.expectEmit();
+    emit StakerCapDeposits.TotalStakeCapSet(initialTotalStakeCap, _newTotalStakeCap);
+    govStaker.setTotalStakeCap(_newTotalStakeCap);
+  }
+
+  function testFuzz_RevertIf_TheCallerIsNotTheAdmin(uint256 _newTotalStakeCap, address _notAdmin)
+    public
+  {
+    vm.assume(_notAdmin != govStaker.admin());
+
+    vm.prank(_notAdmin);
+    vm.expectRevert(
+      abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not admin"), _notAdmin)
+    );
+    govStaker.setTotalStakeCap(_newTotalStakeCap);
+  }
+}
+
+contract _Stake is StakerCapDepositsTest {
+  function testFuzz_AllowsStakingWhenTheAmountIsBelowTheCap(
+    address _depositor,
+    uint256 _amount,
+    address _delegatee
+  ) public {
+    _amount = bound(_amount, 0, govStaker.totalStakeCap());
+    _mintGovToken(_depositor, _amount);
+
+    // Call to stake does not revert.
+    _stake(_depositor, _amount, _delegatee);
+    DelegationSurrogate _surrogate = govStaker.surrogates(_delegatee);
+
+    // Some sanity checks to ensure the stake operation has completed.
+    assertEq(govStaker.totalStaked(), _amount);
+    assertEq(govToken.balanceOf(address(_surrogate)), _amount);
+    assertEq(govToken.delegates(address(_surrogate)), _delegatee);
+    assertEq(govToken.balanceOf(_depositor), 0);
+  }
+
+  function testFuzz_AllowsStakingWhenMultipleDepositsStayBelowTheCap(
+    address _depositor1,
+    address _depositor2,
+    uint256 _amount1,
+    uint256 _amount2,
+    address _delegatee1,
+    address _delegatee2
+  ) public {
+    // The total staked will be <= the cap.
+    _amount1 = bound(_amount1, 0, govStaker.totalStakeCap());
+    _amount2 = bound(_amount2, 0, govStaker.totalStakeCap() - _amount1);
+    _mintGovToken(_depositor1, _amount1);
+    _mintGovToken(_depositor2, _amount2);
+
+    // Calls to stake do not revert
+    Staker.DepositIdentifier _depositId1 = _stake(_depositor1, _amount1, _delegatee1);
+    Staker.DepositIdentifier _depositId2 = _stake(_depositor2, _amount2, _delegatee2);
+    Staker.Deposit memory _deposit1 = _fetchDeposit(_depositId1);
+    Staker.Deposit memory _deposit2 = _fetchDeposit(_depositId2);
+
+    // Some sanity checks to ensure the stake operations completed.
+    assertEq(govStaker.totalStaked(), _amount1 + _amount2);
+    assertEq(_deposit1.balance, _amount1);
+    assertEq(_deposit2.balance, _amount2);
+  }
+
+  function testFuzz_RevertIf_TheAmountIsAboveTheCap(
+    address _depositor,
+    uint256 _amount,
+    address _delegatee
+  ) public {
+    _amount = bound(_amount, govStaker.totalStakeCap() + 1, type(uint96).max);
+    _mintGovToken(_depositor, _amount);
+
+    vm.startPrank(_depositor);
+    govToken.approve(address(govStaker), _amount);
+
+    vm.expectRevert(StakerCapDeposits.StakerCapDeposits__CapExceeded.selector);
+    govStaker.stake(_amount, _delegatee);
+    vm.stopPrank();
+  }
+
+  function testFuzz_RevertIf_TheNextDepositWouldExceedTheCap(
+    address _depositor1,
+    address _depositor2,
+    uint256 _amount1,
+    uint256 _amount2,
+    address _delegatee1,
+    address _delegatee2
+  ) public {
+    _amount1 = bound(_amount1, 0, govStaker.totalStakeCap());
+    uint256 _remainingCap = govStaker.totalStakeCap() - _amount1;
+    // The total staked will be greater than the cap after the second deposit.
+    _amount2 = bound(_amount2, _remainingCap + 1, type(uint96).max);
+    _mintGovToken(_depositor1, _amount1);
+    _mintGovToken(_depositor2, _amount2);
+
+    // First call to stake does not revert.
+    Staker.DepositIdentifier _depositId1 = _stake(_depositor1, _amount1, _delegatee1);
+    Staker.Deposit memory _deposit1 = _fetchDeposit(_depositId1);
+    // Some sanity checks to ensure the stake operation completed.
+    assertEq(govStaker.totalStaked(), _amount1);
+    assertEq(_deposit1.balance, _amount1);
+
+    // The second attempt to stake should revert
+    vm.startPrank(_depositor2);
+    govToken.approve(address(govStaker), _amount2);
+    vm.expectRevert(StakerCapDeposits.StakerCapDeposits__CapExceeded.selector);
+    govStaker.stake(_amount2, _delegatee2);
+    vm.stopPrank();
+  }
+
+  function testFuzz_AllowADepositIfTheCapIsRaised(
+    address _depositor1,
+    address _depositor2,
+    uint256 _amount1,
+    uint256 _amount2,
+    address _delegatee1,
+    address _delegatee2
+  ) public {
+    _amount1 = bound(_amount1, 0, govStaker.totalStakeCap());
+    uint256 _remainingCap = govStaker.totalStakeCap() - _amount1;
+    // The total staked will be greater than the cap after the second deposit.
+    _amount2 = bound(_amount2, _remainingCap + 1, type(uint96).max);
+    _mintGovToken(_depositor1, _amount1);
+    _mintGovToken(_depositor2, _amount2);
+
+    // First call to stake does not revert.
+    Staker.DepositIdentifier _depositId1 = _stake(_depositor1, _amount1, _delegatee1);
+    Staker.Deposit memory _deposit1 = _fetchDeposit(_depositId1);
+    // Some sanity checks to ensure the stake operation completed.
+    assertEq(govStaker.totalStaked(), _amount1);
+    assertEq(_deposit1.balance, _amount1);
+
+    // The second attempt to stake should revert.
+    vm.startPrank(_depositor2);
+    govToken.approve(address(govStaker), _amount2);
+    vm.expectRevert(StakerCapDeposits.StakerCapDeposits__CapExceeded.selector);
+    govStaker.stake(_amount2, _delegatee2);
+    vm.stopPrank();
+
+    // The cap is raised sufficiently high to allow the deposit.
+    uint256 _newTotalStakeCap = _amount1 + _amount2;
+    vm.prank(admin);
+    govStaker.setTotalStakeCap(_newTotalStakeCap);
+
+    // Now the same deposit succeeds.
+    Staker.DepositIdentifier _depositId2 = _stake(_depositor2, _amount2, _delegatee2);
+
+    // Some sanity checks to ensure the stake operation completed.
+    Staker.Deposit memory _deposit2 = _fetchDeposit(_depositId2);
+    assertEq(govStaker.totalStaked(), _amount1 + _amount2);
+    assertEq(_deposit2.balance, _amount2);
+  }
+
+  function testFuzz_RevertIf_TheCapIsLoweredAndTheNextDepositWouldExceedTheCap(
+    address _depositor1,
+    address _depositor2,
+    uint256 _amount1,
+    uint256 _amount2,
+    address _delegatee1,
+    address _delegatee2
+  ) public {
+    // The total staked will be <= the current cap.
+    _amount1 = bound(_amount1, 1, govStaker.totalStakeCap());
+    _amount2 = bound(_amount2, 0, govStaker.totalStakeCap() - _amount1);
+    _mintGovToken(_depositor1, _amount1);
+    _mintGovToken(_depositor2, _amount2);
+
+    // First call to stake does not revert.
+    Staker.DepositIdentifier _depositId1 = _stake(_depositor1, _amount1, _delegatee1);
+    Staker.Deposit memory _deposit1 = _fetchDeposit(_depositId1);
+    // Some sanity checks to ensure the stake operation completed.
+    assertEq(govStaker.totalStaked(), _amount1);
+    assertEq(_deposit1.balance, _amount1);
+
+    // The cap is lowered to make the next deposit impossible.
+    uint256 _newTotalStakeCap = _amount1 + _amount2 - 1;
+    vm.prank(admin);
+    govStaker.setTotalStakeCap(_newTotalStakeCap);
+
+    // The second attempt to stake should revert.
+    vm.startPrank(_depositor2);
+    govToken.approve(address(govStaker), _amount2);
+    vm.expectRevert(StakerCapDeposits.StakerCapDeposits__CapExceeded.selector);
+    govStaker.stake(_amount2, _delegatee2);
+    vm.stopPrank();
+  }
+}
+
+contract _StakeMore is StakerCapDepositsTest {
+  function testFuzz_AllowsMoreToBeStakedIfTheTotalIsBelowTheCap(
+    address _depositor,
+    uint256 _depositAmount,
+    uint256 _addAmount,
+    address _delegatee
+  ) public {
+    _depositAmount = bound(_depositAmount, 0, govStaker.totalStakeCap());
+    uint256 _remainingCap = govStaker.totalStakeCap() - _depositAmount;
+    // The amount added to the deposit will still be less than the cap.
+    _addAmount = bound(_addAmount, 0, _remainingCap);
+    _mintGovToken(_depositor, _depositAmount + _addAmount);
+
+    // Initial stake is completed
+    Staker.DepositIdentifier _depositId = _stake(_depositor, _depositAmount, _delegatee);
+    // More stake is added without the call reverting.
+    vm.startPrank(_depositor);
+    govToken.approve(address(govStaker), _addAmount);
+    govStaker.stakeMore(_depositId, _addAmount);
+    vm.stopPrank();
+
+    Staker.Deposit memory _deposit = _fetchDeposit(_depositId);
+    DelegationSurrogate _surrogate = govStaker.surrogates(_deposit.delegatee);
+
+    // Sanity checks to make sure the staking operations completed successfully.
+    assertEq(govStaker.totalStaked(), _depositAmount + _addAmount);
+    assertEq(govToken.balanceOf(address(_surrogate)), _depositAmount + _addAmount);
+    assertEq(_deposit.balance, _depositAmount + _addAmount);
+  }
+
+  function testFuzz_RevertIf_StakingMoreWouldExceedTheCap(
+    address _depositor,
+    uint256 _depositAmount,
+    uint256 _addAmount,
+    address _delegatee
+  ) public {
+    _depositAmount = bound(_depositAmount, 0, govStaker.totalStakeCap());
+    uint256 _remainingCap = govStaker.totalStakeCap() - _depositAmount;
+    // The amount added cause the total staked to exceed the cap.
+    _addAmount = bound(_addAmount, _remainingCap + 1, type(uint96).max);
+    _mintGovToken(_depositor, _depositAmount + _addAmount);
+
+    // Initial stake is completed
+    Staker.DepositIdentifier _depositId = _stake(_depositor, _depositAmount, _delegatee);
+
+    // Reverts when attempting to add more such that the cap is exceeded.
+    vm.startPrank(_depositor);
+    govToken.approve(address(govStaker), _addAmount);
+    vm.expectRevert(StakerCapDeposits.StakerCapDeposits__CapExceeded.selector);
+    govStaker.stakeMore(_depositId, _addAmount);
+    vm.stopPrank();
+  }
+}
+```
+
+### Example 4: ERC20 Contract Tests
+```solidity
+// SPDX-License-Identifier: AGPL-3.0-only
+pragma solidity ^0.8.17;
+
+// Modified from Solmate at the below commit, with `testFail` usage replaced with
+// `vm.expectRevert`
+// https://github.com/transmissions11/solmate/blob/1b3adf677e7e383cc684b5d5bd441da86bf4bf1c/src/test/ERC20.t.sol
+
+import {stdError, Test} from "forge-std/Test.sol";
+import {MockERC20} from "test/mocks/MockERC20.sol";
+
+contract ERC20Test is Test {
+  MockERC20 token;
+
+  bytes32 constant PERMIT_TYPEHASH =
+    keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+
+  event Transfer(address indexed from, address indexed to, uint256 amount);
+  event Approval(address indexed owner, address indexed spender, uint256 amount);
+
+  function setUp() public virtual {
+    token = new MockERC20("Token", "TKN", 18);
+  }
+}
+
+contract Constructor is ERC20Test {
+  function test_StoredNameMatchesConstructorInput() public {
+    assertEq(token.name(), "Token");
+  }
+
+  function test_StoredSymbolMatchesConstructorInput() public {
+    assertEq(token.symbol(), "TKN");
+  }
+
+  function test_StoredDecimalsMatchesConstructorInput() public {
+    assertEq(token.decimals(), 18);
+  }
+
+  function test_SetsInitialChainId() public {
+    assertEq(token.exposed_INITIAL_CHAIN_ID(), block.chainid);
+  }
+
+  function test_SetsInitialDomainSeparator() public {
+    assertEq(
+      token.exposed_INITIAL_DOMAIN_SEPARATOR(),
+      hex"aa9e832a9ef68cda525e9c935a73b5f1f4a30877cfb71ae89cf97bb686658b2c"
+    );
+  }
+}
+
+contract Approve is ERC20Test {
+  function test_SetsAllowanceMappingToApprovedAmount() public {
+    token.approve(address(0xBEEF), 1e18);
+    assertEq(token.allowance(address(this), address(0xBEEF)), 1e18);
+  }
+
+  function test_ReturnsTrueForSuccessfulApproval() public {
+    assertTrue(token.approve(address(0xBEEF), 1e18));
+  }
+
+  function test_EmitsApprovalEvent() public {
+    vm.expectEmit(true, true, true, true);
+    emit Approval(address(this), address(0xBEEF), 1e18);
+    token.approve(address(0xBEEF), 1e18);
+  }
+}
+
+contract Transfer is ERC20Test {
+  function setUp() public override {
+    ERC20Test.setUp();
+    token.mint(address(this), 1e18);
+  }
+
+  function test_RevertIf_SpenderHasInsufficientBalance() public {
+    vm.expectRevert(stdError.arithmeticError);
+    token.transfer(address(0xBEEF), 2e18);
+  }
+
+  function test_DoesNotChangeTotalSupply() public {
+    uint256 initTotalSupply = token.totalSupply();
+    token.transfer(address(0xBEEF), 1e18);
+    assertEq(token.totalSupply(), initTotalSupply);
+  }
+
+  function test_IncreasesRecipientBalanceBySentAmount() public {
+    uint256 initRecipientBalance = token.balanceOf(address(0xBEEF));
+    token.transfer(address(0xBEEF), 1e18);
+    assertEq(token.balanceOf(address(0xBEEF)), initRecipientBalance + 1e18);
+  }
+
+  function test_DecreasesSenderBalanceBySentAmount() public {
+    uint256 initSenderBalance = token.balanceOf(address(this));
+    token.transfer(address(0xBEEF), 1e18);
+    assertEq(token.balanceOf(address(this)), initSenderBalance - 1e18);
+  }
+
+  function test_ReturnsTrue() public {
+    assertTrue(token.transfer(address(0xBEEF), 1e18));
+  }
+
+  function test_EmitsTransferEvent() public {
+    vm.expectEmit(true, true, true, true);
+    emit Transfer(address(this), address(0xBEEF), 1e18);
+    token.transfer(address(0xBEEF), 1e18);
+  }
+}
+```
+
+### Example 0: WithdrawGate Contract Complete Example
+Here is an example of a complete test suite for the WithdrawGate contract.
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.28;
+
+import {Ownable} from "openzeppelin/access/Ownable.sol";
+import {UniLst} from "src/UniLst.sol";
+import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
+import {EIP712} from "openzeppelin/utils/cryptography/EIP712.sol";
+import {SignatureChecker} from "openzeppelin/utils/cryptography/SignatureChecker.sol";
+import {Multicall} from "openzeppelin/utils/Multicall.sol";
+
+/// @title WithdrawGate
+/// @notice A contract to enforce a withdrawal delay for users exiting the LST.
+contract WithdrawGate is Ownable, Multicall, EIP712 {
+  /// @notice Thrown when an invalid LST address is provided.
+  error WithdrawGate__InvalidLSTAddress();
+
+  /// @notice Thrown when an invalid delay is set.
+  error WithdrawGate__InvalidDelay();
+
+  /// @notice Thrown when the caller is not the LST.
+  error WithdrawGate__CallerNotLST();
+
+  /// @notice Thrown when the withdrawal is not found.
+  error WithdrawGate__WithdrawalNotFound();
+
+  /// @notice Thrown when the withdrawal is not yet eligible.
+  error WithdrawGate__WithdrawalNotEligible();
+
+  /// @notice Thrown when the withdrawal has already been completed.
+  error WithdrawGate__WithdrawalAlreadyCompleted();
+
+  /// @notice Thrown when the caller is not the designated receiver.
+  error WithdrawGate__CallerNotReceiver();
+
+  /// @notice Thrown when the signature is invalid.
+  error WithdrawGate__InvalidSignature();
+
+  /// @notice Thrown when the deadline has expired.
+  error WithdrawGate__ExpiredDeadline();
+
+  /// @notice The address of the LST contract.
+  address public immutable LST;
+
+  /// @notice The address of the token that can be withdrawn, assumed to revert on failed transfers.
+  address public immutable WITHDRAWAL_TOKEN;
+
+  /// @notice The maximum allowed delay for withdrawals.
+  uint256 public constant DELAY_MAX = 30 days;
+
+  /// @notice The current delay period for withdrawals.
+  uint256 public delay;
+
+  /// @notice The EIP-712 typehash for the CompleteWithdrawal struct.
+  bytes32 public constant COMPLETE_WITHDRAWAL_TYPEHASH =
+    keccak256("CompleteWithdrawal(uint256 identifier,uint256 deadline)");
+
+  /// @notice A struct to store withdrawal information.
+  struct Withdrawal {
+    address receiver;
+    uint96 amount;
+    uint256 eligibleTimestamp;
+  }
+
+  /// @notice Mapping from withdrawal identifier to Withdrawal struct.
+  mapping(uint256 withdrawId => Withdrawal withdrawal) public withdrawals;
+
+  /// @notice Counter for generating unique withdrawal identifiers.
+  uint256 internal nextWithdrawalId;
+
+  /// @notice Emitted when the delay period is set.
+  event DelaySet(uint256 oldDelay, uint256 newDelay);
+
+  /// @notice Emitted when a withdrawal is initiated.
+  event WithdrawalInitiated(uint256 amount, address receiver, uint256 eligibleTimestamp, uint256 identifier);
+
+  /// @notice Emitted when a withdrawal is completed.
+  event WithdrawalCompleted(uint256 identifier, address receiver, uint256 amount);
+
+  /// @notice Initializes the WithdrawGate contract.
+  /// @param _owner The address that will own this contract.
+  /// @param _lst The address of the LST contract.
+  /// @param _initialDelay The initial withdrawal delay period.
+  constructor(address _owner, address _lst, address _withdrawalToken, uint256 _initialDelay)
+    Ownable(_owner)
+    EIP712("WithdrawGate", "1")
+  {
+    if (_lst == address(0)) {
+      revert WithdrawGate__InvalidLSTAddress();
+    }
+    if (_initialDelay > DELAY_MAX) {
+      revert WithdrawGate__InvalidDelay();
+    }
+
+    LST = _lst;
+    WITHDRAWAL_TOKEN = _withdrawalToken;
+    _setDelay(_initialDelay);
+    nextWithdrawalId = 1;
+  }
+
+  /// @notice Sets a new delay period for withdrawals.
+  /// @param _newDelay The new delay period to set.
+  /// @dev Only the contract owner can call this function.
+  /// @dev Reverts if the new delay exceeds DELAY_MAX.
+  function setDelay(uint256 _newDelay) external {
+    _checkOwner();
+    _setDelay(_newDelay);
+  }
+
+  /// @notice Internal function to set the delay period.
+  /// @param _newDelay The new delay period to set.
+  /// @dev Reverts if the new delay exceeds DELAY_MAX.
+  function _setDelay(uint256 _newDelay) internal {
+    if (_newDelay > DELAY_MAX) {
+      revert WithdrawGate__InvalidDelay();
+    }
+
+    uint256 _oldDelay = delay;
+
+    emit DelaySet(_oldDelay, _newDelay);
+    delay = _newDelay;
+  }
+
+  /// @notice Initiates a withdrawal for a user.
+  /// @param _amount The amount of tokens to withdraw.
+  /// @param _receiver The address that will receive the tokens.
+  /// @return _identifier The unique identifier for this withdrawal.
+  /// @dev Can only be called by the LST contract.
+  /// @dev Assumes the WITHDRAW_TOKENs have already been transferred to this contract.
+  function initiateWithdrawal(uint96 _amount, address _receiver) external returns (uint256 _identifier) {
+    if (msg.sender != LST) {
+      revert WithdrawGate__CallerNotLST();
+    }
+    if (_receiver == address(0)) {
+      revert WithdrawGate__CallerNotReceiver();
+    }
+
+    _identifier = nextWithdrawalId++;
+    uint256 _eligibleTimestamp = block.timestamp + delay;
+
+    withdrawals[_identifier] = Withdrawal({receiver: _receiver, amount: _amount, eligibleTimestamp: _eligibleTimestamp});
+
+    emit WithdrawalInitiated(_amount, _receiver, _eligibleTimestamp, _identifier);
+  }
+
+  /// @notice Completes a previously initiated withdrawal.
+  /// @param _identifier The unique identifier of the withdrawal to complete.
+  function completeWithdrawal(uint256 _identifier) external {
+    if (nextWithdrawalId <= _identifier) {
+      revert WithdrawGate__WithdrawalNotFound();
+    }
+
+    Withdrawal memory _withdrawal = withdrawals[_identifier];
+
+    if (msg.sender != _withdrawal.receiver) {
+      revert WithdrawGate__CallerNotReceiver();
+    }
+
+    _completeWithdrawal(_identifier, _withdrawal);
+  }
+
+  /// @notice Completes a previously initiated withdrawal on behalf of the receiver.
+  /// @param _deadline The deadline by which the withdrawal must be completed.
+  /// @param _identifier The unique identifier of the withdrawal to complete.
+  /// @param _signature The EIP-712 or EIP-1271 signature authorizing the withdrawal.
+  function completeWithdrawalOnBehalf(uint256 _identifier, uint256 _deadline, bytes memory _signature) external {
+    if (nextWithdrawalId <= _identifier) {
+      revert WithdrawGate__WithdrawalNotFound();
+    }
+
+    Withdrawal memory _withdrawal = withdrawals[_identifier];
+    if (block.timestamp > _deadline) {
+      revert WithdrawGate__ExpiredDeadline();
+    }
+
+    bytes32 _structHash = keccak256(abi.encode(COMPLETE_WITHDRAWAL_TYPEHASH, _identifier, _deadline));
+    bool _isValid =
+      SignatureChecker.isValidSignatureNow(_withdrawal.receiver, _hashTypedDataV4(_structHash), _signature);
+    if (!_isValid) {
+      revert WithdrawGate__InvalidSignature();
+    }
+
+    _completeWithdrawal(_identifier, _withdrawal);
+  }
+
+  /// @notice Internal function to complete a withdrawal.
+  /// @param _identifier The unique identifier of the withdrawal to complete.
+  /// @param _withdrawal The memory reference to the Withdrawal struct.
+  function _completeWithdrawal(uint256 _identifier, Withdrawal memory _withdrawal) internal {
+    if (block.timestamp < _withdrawal.eligibleTimestamp || _withdrawal.eligibleTimestamp == 0) {
+      revert WithdrawGate__WithdrawalNotEligible();
+    }
+
+    // Clear the withdrawal by zeroing the eligibleTimestamp
+    withdrawals[_identifier].eligibleTimestamp = 0;
+
+    // This transfer assumes WITHDRAWAL_TOKEN will revert if the transfer fails.
+    IERC20(WITHDRAWAL_TOKEN).transfer(_withdrawal.receiver, _withdrawal.amount);
+
+    emit WithdrawalCompleted(_identifier, _withdrawal.receiver, _withdrawal.amount);
+  }
+
+  /// @notice Gets the next withdrawal identifier.
+  /// @return The next withdrawal identifier.
+  function getNextWithdrawalId() external view returns (uint256) {
+    return nextWithdrawalId;
+  }
+}
+```
+
+#### Example WithdrawGate Test Suite
+This is an example of a test suite for the WithdrawGate contract.
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.28;
+
+import {console2} from "forge-std/Test.sol";
+import {WithdrawGate} from "src/WithdrawGate.sol";
+import {IUni} from "src/interfaces/IUni.sol";
+import {UniLst} from "src/UniLst.sol";
+import {TestHelpers} from "test/helpers/TestHelpers.sol";
+import {MockERC20Token} from "test/mocks/MockERC20Token.sol";
+import {FakeERC1271Wallet} from "test/fakes/FakeERC1271Wallet.sol";
+import {Eip712Helper} from "test/helpers/Eip712Helper.sol";
+import {Ownable} from "openzeppelin/access/Ownable.sol";
+import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
+import {ECDSA} from "openzeppelin/utils/cryptography/ECDSA.sol";
+import {SignatureChecker} from "openzeppelin/utils/cryptography/SignatureChecker.sol";
+
+contract WithdrawGateTest is TestHelpers {
+  WithdrawGate withdrawGate;
+  MockERC20Token stakeToken;
+  address owner;
+  address lst;
+  uint256 initialDelay;
+
+  function setUp() public virtual {
+    owner = makeAddr("Owner");
+    lst = makeAddr("LST");
+    stakeToken = new MockERC20Token();
+    initialDelay = 7 days;
+
+    vm.mockCall(lst, abi.encodeWithSelector(UniLst(lst).STAKE_TOKEN.selector), abi.encode(address(stakeToken)));
+
+    withdrawGate = new WithdrawGate(owner, lst, address(stakeToken), initialDelay);
+
+    // Warp to a non-zero timestamp to avoid issues with zero timestamps
+    vm.warp(1);
+  }
+
+  function _assumeSafeAddress(address _address) internal pure {
+    vm.assume(_address != address(0));
+    _assumeSafeMockAddress(_address);
+  }
+
+  function _assumeNotOwnerAddress(address _address) internal view {
+    vm.assume(_address != owner);
+  }
+
+  function _boundToReasonableDelay(uint256 _delay) internal pure returns (uint256) {
+    return bound(_delay, 0, 30 days);
+  }
+
+  function _boundToUnreasonableDelay(uint256 _delay) internal pure returns (uint256) {
+    return bound(_delay, 30 days + 1, type(uint256).max);
+  }
+
+  function _boundToReasonableExtraTime(uint256 _extraTime) internal pure returns (uint256) {
+    return bound(_extraTime, 1, 3650 days);
+  }
+
+  function _boundToOneHundredWithdrawals(uint256 _withdrawalCount) internal pure returns (uint256) {
+    return bound(_withdrawalCount, 1, 100);
+  }
+
+  function _boundToReasonableDeadline(uint256 _deadline, uint256 _extraTime) internal view returns (uint256) {
+    uint256 warpAmount = block.timestamp + initialDelay + _extraTime;
+    return bound(_deadline, warpAmount, warpAmount + 3650 days);
+  }
+
+  function _boundToUnreasonableDeadline(uint256 _deadline, uint256 _extraTime) internal view returns (uint256) {
+    uint256 warpAmount = block.timestamp + initialDelay + _extraTime;
+    return bound(_deadline, 0, warpAmount - 1);
+  }
+
+  function _boundToValidPrivateKey(uint256 _privateKey) internal pure returns (uint256) {
+    return bound(_privateKey, 1, SECP256K1_ORDER - 1);
+  }
+}
+
+contract Constructor is WithdrawGateTest {
+  function test_SetsConfigurationParameters() public view {
+    assertEq(withdrawGate.owner(), owner);
+    assertEq(withdrawGate.LST(), lst);
+    assertEq(withdrawGate.WITHDRAWAL_TOKEN(), address(stakeToken));
+    assertEq(withdrawGate.delay(), initialDelay);
+  }
+
+  function testFuzz_SetsConfigurationParametersToArbitraryValues(
+    address _owner,
+    address _lst,
+    address _stakeToken,
+    uint256 _initialDelay
+  ) public {
+    _assumeSafeAddress(_owner);
+    _assumeSafeAddress(_lst);
+    _initialDelay = _boundToReasonableDelay(_initialDelay);
+
+    WithdrawGate _withdrawGate = new WithdrawGate(_owner, _lst, _stakeToken, _initialDelay);
+
+    assertEq(_withdrawGate.owner(), _owner);
+    assertEq(_withdrawGate.LST(), _lst);
+    assertEq(_withdrawGate.WITHDRAWAL_TOKEN(), address(_stakeToken));
+    assertEq(_withdrawGate.delay(), _initialDelay);
+  }
+
+  function testFuzz_RevertIf_LstAddressIsZero(address _owner, address _stakeToken, uint256 _initialDelay) public {
+    _assumeSafeAddress(_owner);
+    _initialDelay = _boundToReasonableDelay(_initialDelay);
+
+    vm.expectRevert(WithdrawGate.WithdrawGate__InvalidLSTAddress.selector);
+    new WithdrawGate(_owner, address(0), _stakeToken, _initialDelay);
+  }
+
+  function testFuzz_RevertIf_InitialDelayExceedsMaximum(
+    address _owner,
+    address _lst,
+    address _stakeToken,
+    uint256 _delay
+  ) public {
+    _assumeSafeAddress(_owner);
+    _assumeSafeAddress(_lst);
+    _delay = _boundToUnreasonableDelay(_delay);
+
+    vm.mockCall(_lst, abi.encodeWithSelector(UniLst(lst).STAKE_TOKEN.selector), abi.encode(address(stakeToken)));
+
+    vm.expectRevert(WithdrawGate.WithdrawGate__InvalidDelay.selector);
+    new WithdrawGate(_owner, _lst, _stakeToken, _delay);
+  }
+}
+
+contract SetDelay is WithdrawGateTest {
+  function testFuzz_SetsTheDelayWhenCalledByTheOwnerWithAValidValue(uint256 _newDelay) public {
+    _newDelay = _boundToReasonableDelay(_newDelay);
+    vm.prank(owner);
+    withdrawGate.setDelay(_newDelay);
+    assertEq(withdrawGate.delay(), _newDelay);
+  }
+
+  function test_RevertIf_SetDelayCalledByNonOwner(address _owner, uint256 _newDelay) public {
+    _assumeNotOwnerAddress(_owner);
+    _newDelay = _boundToReasonableDelay(_newDelay);
+    vm.startPrank(_owner);
+    vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, _owner));
+    withdrawGate.setDelay(_newDelay);
+    vm.stopPrank();
+  }
+
+  function testFuzz_RevertIf_SetDelayExceedsMaximum(uint256 _newDelay) public {
+    _newDelay = _boundToUnreasonableDelay(_newDelay);
+    vm.prank(owner);
+    vm.expectRevert(WithdrawGate.WithdrawGate__InvalidDelay.selector);
+    withdrawGate.setDelay(_newDelay);
+  }
+
+  function testFuzz_EmitsSetDelayEventWhenCalledByTheOwnerWithAValidValue(uint256 _newDelay) public {
+    _newDelay = _boundToReasonableDelay(_newDelay);
+    vm.prank(owner);
+    vm.expectEmit();
+    emit WithdrawGate.DelaySet(initialDelay, _newDelay);
+    withdrawGate.setDelay(_newDelay);
+  }
+}
+
+contract InitiateWithdrawal is WithdrawGateTest {
+  function testFuzz_InitiatesWithdrawalWhenCalledByLst(uint96 _amount, address _receiver) public {
+    _assumeSafeAddress(_receiver);
+    vm.prank(lst);
+    uint256 identifier = withdrawGate.initiateWithdrawal(_amount, _receiver);
+
+    (address receiver, uint96 amount, uint256 eligibleTimestamp) = withdrawGate.withdrawals(identifier);
+    assertEq(receiver, _receiver);
+    assertEq(amount, _amount);
+    assertEq(eligibleTimestamp, block.timestamp + initialDelay);
+    assertEq(identifier, 1); // First withdrawal should have ID 1
+  }
+
+  function testFuzz_EmitsWithdrawalInitiatedEvent(uint96 _amount, address _receiver) public {
+    _assumeSafeAddress(_receiver);
+    vm.prank(lst);
+
+    uint256 expectedIdentifier = 1; // First withdrawal should have ID 1
+
+    vm.expectEmit();
+    emit WithdrawGate.WithdrawalInitiated(_amount, _receiver, block.timestamp + initialDelay, expectedIdentifier);
+
+    withdrawGate.initiateWithdrawal(_amount, _receiver);
+  }
+
+  function test_IncrementsWithdrawIdAfterEachInitiateWithdrawal() public {
+    vm.startPrank(lst);
+
+    // Inputs the first withdrawal initiation call
+    uint96 _amount = 100;
+    address _receiver = makeAddr("Receiver");
+
+    for (uint256 i = 1; i <= 100; i++) {
+      _assumeSafeAddress(_receiver);
+      uint256 identifier = withdrawGate.initiateWithdrawal(_amount, _receiver);
+      assertEq(identifier, i);
+
+      // Assign new inputs for the next withdrawal initiation by hashing the last inputs.
+      _receiver = address(uint160(uint256(keccak256(abi.encode(_receiver)))));
+      _amount = uint96(uint256(keccak256(abi.encode(_amount))));
+    }
+    vm.stopPrank();
+  }
+
+  function testFuzz_RevertIf_CalledByNonLst(address _caller, uint96 _amount, address _receiver) public {
+    vm.assume(_caller != lst);
+    _assumeSafeAddress(_receiver);
+    vm.prank(_caller);
+    vm.expectRevert(WithdrawGate.WithdrawGate__CallerNotLST.selector);
+    withdrawGate.initiateWithdrawal(_amount, _receiver);
+  }
+
+  function testFuzz_RevertIf_ReceiverIsZero(uint96 _amount) public {
+    vm.prank(lst);
+    vm.expectRevert(WithdrawGate.WithdrawGate__CallerNotReceiver.selector);
+    withdrawGate.initiateWithdrawal(_amount, address(0));
+  }
+}
+
+contract CompleteWithdrawal is WithdrawGateTest {
+  function testFuzz_CompletesWithdrawalWhenEligible(uint96 _amount, address _receiver, uint256 _extraTime) public {
+    _assumeSafeAddress(_receiver);
+    _extraTime = _boundToReasonableExtraTime(_extraTime);
+
+    // Initiate withdrawal
+    vm.prank(lst);
+    uint256 withdrawalId = withdrawGate.initiateWithdrawal(_amount, _receiver);
+
+    // Warp time and complete withdrawal
+    vm.warp(block.timestamp + initialDelay + _extraTime);
+    vm.prank(_receiver);
+    withdrawGate.completeWithdrawal(withdrawalId);
+
+    (address receiver, uint96 amount, uint256 eligibleTimestamp) = withdrawGate.withdrawals(withdrawalId);
+
+    assertEq(receiver, _receiver);
+    assertEq(amount, _amount);
+    assertEq(eligibleTimestamp, 0); // Timestamp should be zeroed out after completion
+
+    // External call to stakeToken.transfer should have been made
+    assertEq(stakeToken.lastParam__transfer_to(), _receiver);
+    assertEq(stakeToken.lastParam__transfer_amount(), _amount);
+  }
+
+  function testFuzz_EmitsWithdrawalCompletedEvent(uint96 _amount, address _receiver, uint256 _extraTime) public {
+    _assumeSafeAddress(_receiver);
+    _extraTime = _boundToReasonableExtraTime(_extraTime);
+
+    vm.prank(lst);
+    uint256 withdrawalId = withdrawGate.initiateWithdrawal(_amount, _receiver);
+
+    vm.mockCall(
+      address(stakeToken), abi.encodeWithSelector(IERC20.transfer.selector, _receiver, _amount), abi.encode(true)
+    );
+
+    vm.warp(block.timestamp + initialDelay + _extraTime);
+    vm.prank(_receiver);
+    vm.expectEmit();
+    emit WithdrawGate.WithdrawalCompleted(withdrawalId, _receiver, _amount);
+    withdrawGate.completeWithdrawal(withdrawalId);
+  }
+
+  function testFuzz_RevertIf_CallerNotReceiver(uint96 _amount, address _receiver, address _caller) public {
+    _assumeSafeAddress(_receiver);
+    vm.assume(_caller != _receiver);
+    uint256 warpTime = block.timestamp + initialDelay + 1;
+
+    vm.prank(lst);
+    uint256 withdrawalId = withdrawGate.initiateWithdrawal(_amount, _receiver);
+
+    vm.warp(warpTime);
+
+    vm.prank(_caller);
+    vm.expectRevert(WithdrawGate.WithdrawGate__CallerNotReceiver.selector);
+    withdrawGate.completeWithdrawal(withdrawalId);
+  }
+
+  function testFuzz_RevertIf_WithdrawalNotEligible(uint96 _amount, address _receiver, uint256 _earlyTime) public {
+    _assumeSafeAddress(_receiver);
+    _earlyTime = bound(_earlyTime, 0, initialDelay - 1);
+
+    vm.prank(lst);
+    uint256 withdrawalId = withdrawGate.initiateWithdrawal(_amount, _receiver);
+
+    vm.warp(block.timestamp + _earlyTime);
+    vm.prank(_receiver);
+    vm.expectRevert(WithdrawGate.WithdrawGate__WithdrawalNotEligible.selector);
+    withdrawGate.completeWithdrawal(withdrawalId);
+  }
+
+  function testFuzz_RevertIf_WithdrawalNotFound(uint256 _nonExistentId, uint96 _amount, address _receiver) public {
+    _nonExistentId = bound(_nonExistentId, 2, type(uint256).max); // 2 since initial withdrawal once
+    _assumeSafeAddress(_receiver);
+
+    // Perform one withdrawal
+    vm.prank(lst);
+    withdrawGate.initiateWithdrawal(_amount, _receiver);
+
+    vm.expectRevert(WithdrawGate.WithdrawGate__WithdrawalNotFound.selector);
+    withdrawGate.completeWithdrawal(_nonExistentId);
+  }
+
+  function testFuzz_RevertIf_WithdrawalAlreadyCompleted(uint256 _amount, address _receiver, uint256 _extraTime) public {
+    _assumeSafeAddress(_receiver);
+    _extraTime = _boundToReasonableExtraTime(_extraTime);
+
+    vm.prank(lst);
+    uint256 withdrawalId = withdrawGate.initiateWithdrawal(uint96(_amount), _receiver);
+
+    vm.mockCall(
+      address(stakeToken), abi.encodeWithSelector(IERC20.transfer.selector, _receiver, _amount), abi.encode(true)
+    );
+
+    vm.warp(block.timestamp + initialDelay + _extraTime);
+    vm.startPrank(_receiver);
+    withdrawGate.completeWithdrawal(withdrawalId);
+    vm.expectRevert(WithdrawGate.WithdrawGate__WithdrawalNotEligible.selector);
+    withdrawGate.completeWithdrawal(withdrawalId);
+    vm.stopPrank();
+  }
+}
+
+contract GetNextWithdrawalId is WithdrawGateTest {
+  function test_ReturnsNextWithdrawalIdCorrectlyAfterInitiateWithdrawal() public {
+    vm.startPrank(lst);
+
+    // Inputs the first withdrawal initiation call
+    uint96 _amount = 100;
+    address _receiver = makeAddr("Receiver");
+
+    for (uint256 i = 1; i <= 100; i++) {
+      _assumeSafeAddress(_receiver);
+      withdrawGate.initiateWithdrawal(_amount, _receiver);
+      assertEq(withdrawGate.getNextWithdrawalId(), i + 1);
+
+      // Assign new inputs for the next withdrawal initiation by hashing the last inputs.
+      _receiver = address(uint160(uint256(keccak256(abi.encode(_receiver)))));
+      _amount = uint96(uint256(keccak256(abi.encode(_amount))));
+    }
+
+    vm.stopPrank();
+  }
+}
+
+contract CompleteWithdrawalOnBehalf is WithdrawGateTest, Eip712Helper {
+  using ECDSA for bytes32;
+
+  // EIP-712 constants
+  bytes32 private DOMAIN_SEPARATOR;
+
+  function setUp() public override {
+    super.setUp();
+
+    // Compute the domain separator
+    DOMAIN_SEPARATOR = _domainSeperator(EIP712_DOMAIN_TYPEHASH, "WithdrawGate", "1", address(withdrawGate));
+  }
+
+  function _hashTypedDataV4(bytes32 structHash) internal view returns (bytes32) {
+    return keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, structHash));
+  }
+
+  function _signWithdrawalMessage(uint256 _withdrawalId, uint256 _deadline, uint256 _signerPrivateKey)
+    internal
+    view
+    returns (bytes memory)
+  {
+    bytes32 structHash = keccak256(abi.encode(withdrawGate.COMPLETE_WITHDRAWAL_TYPEHASH(), _withdrawalId, _deadline));
+    bytes32 hash = _hashTypedDataV4(structHash);
+    (uint8 v, bytes32 r, bytes32 s) = vm.sign(_signerPrivateKey, hash);
+    return abi.encodePacked(r, s, v);
+  }
+
+  function testFuzz_CompletesWithdrawalOnBehalfWithEoaSignature(
+    uint96 _amount,
+    uint256 _extraTime,
+    uint256 _deadline,
+    uint256 _alicePk
+  ) public {
+    _extraTime = _boundToReasonableExtraTime(_extraTime);
+    _deadline = _boundToReasonableDeadline(_deadline, _extraTime);
+    _alicePk = _boundToValidPrivateKey(_alicePk);
+    address alice = vm.addr(_alicePk);
+
+    // Initiate withdrawal
+    vm.prank(lst);
+    uint256 withdrawalId = withdrawGate.initiateWithdrawal(_amount, alice);
+
+    // Warp time
+    vm.warp(block.timestamp + initialDelay + _extraTime);
+
+    // Sign the withdrawal message
+    bytes memory signature = _signWithdrawalMessage(withdrawalId, _deadline, _alicePk);
+
+    // Complete withdrawal on behalf
+    withdrawGate.completeWithdrawalOnBehalf(withdrawalId, _deadline, signature);
+
+    // Assert withdrawal is completed (eligibleTimestamp should be 0)
+    (,, uint256 eligibleTimestamp) = withdrawGate.withdrawals(withdrawalId);
+    assertEq(eligibleTimestamp, 0);
+
+    // Assert transfer occurred
+    assertEq(stakeToken.lastParam__transfer_to(), alice);
+    assertEq(stakeToken.lastParam__transfer_amount(), _amount);
+  }
+
+  function testFuzz_CompletesWithdrawalOnBehalfWithErc1271Signature(
+    uint96 _amount,
+    uint256 _deadline,
+    uint256 _extraTime,
+    uint256 _alicePk
+  ) public {
+    _extraTime = _boundToReasonableExtraTime(_extraTime);
+    _deadline = _boundToReasonableDeadline(_deadline, _extraTime);
+    _alicePk = _boundToValidPrivateKey(_alicePk);
+    address alice = vm.addr(_alicePk);
+    FakeERC1271Wallet fakeWallet = new FakeERC1271Wallet(alice);
+
+    // Initiate withdrawal
+    vm.prank(lst);
+    uint256 withdrawalId = withdrawGate.initiateWithdrawal(_amount, address(fakeWallet));
+
+    // Warp time
+    vm.warp(block.timestamp + initialDelay + _extraTime);
+
+    // Sign the withdrawal message (mock wallet uses ALICE's key)
+    bytes memory signature = _signWithdrawalMessage(withdrawalId, _deadline, _alicePk);
+
+    // Complete withdrawal on behalf
+    withdrawGate.completeWithdrawalOnBehalf(withdrawalId, _deadline, signature);
+
+    // Assert withdrawal is completed (eligibleTimestamp should be 0)
+    (,, uint256 eligibleTimestamp) = withdrawGate.withdrawals(withdrawalId);
+    assertEq(eligibleTimestamp, 0);
+
+    // Assert transfer occurred
+    assertEq(stakeToken.lastParam__transfer_to(), address(fakeWallet));
+    assertEq(stakeToken.lastParam__transfer_amount(), _amount);
+  }
+
+  function testFuzz_RevertIf_InvalidSignatureForWithdraw(
+    uint96 _amount,
+    uint256 _deadline,
+    uint256 _extraTime,
+    uint256 _fakeKey,
+    uint256 _alicePk
+  ) public {
+    _extraTime = _boundToReasonableExtraTime(_extraTime);
+    _deadline = _boundToReasonableDeadline(_deadline, _extraTime);
+    _alicePk = _boundToValidPrivateKey(_alicePk);
+    _fakeKey = _boundToValidPrivateKey(_fakeKey);
+    vm.assume(_alicePk != _fakeKey);
+    address alice = vm.addr(_alicePk);
+
+    // Initiate withdrawal
+    vm.prank(lst);
+    uint256 withdrawalId = withdrawGate.initiateWithdrawal(_amount, alice);
+
+    // Warp time
+    vm.warp(block.timestamp + initialDelay + _extraTime);
+
+    // Sign with incorrect key
+    bytes memory invalidSignature = _signWithdrawalMessage(withdrawalId, _deadline, _fakeKey);
+
+    // Attempt to complete withdrawal
+    vm.expectRevert(WithdrawGate.WithdrawGate__InvalidSignature.selector);
+    withdrawGate.completeWithdrawalOnBehalf(withdrawalId, _deadline, invalidSignature);
+  }
+
+  function testFuzz_RevertIf_WithdrawalNotFound(uint256 _fakeId, uint256 _alicePk, uint256 _deadline) public {
+    _fakeId = bound(_fakeId, 2, type(uint256).max); // 2 since initial withdrawal once
+    _alicePk = _boundToValidPrivateKey(_alicePk);
+    bytes memory signature = _signWithdrawalMessage(_fakeId, _deadline, _alicePk);
+
+    vm.expectRevert(WithdrawGate.WithdrawGate__WithdrawalNotFound.selector);
+    withdrawGate.completeWithdrawalOnBehalf(_fakeId, _deadline, signature);
+  }
+
+  function testFuzz_RevertIf_WithdrawalNotEligible(
+    uint96 _amount,
+    uint256 _deadline,
+    uint256 _earlyTime,
+    uint256 _alicePk
+  ) public {
+    _earlyTime = bound(_earlyTime, 0, initialDelay - 1);
+    _deadline = bound(_deadline, block.timestamp + initialDelay + _earlyTime, type(uint256).max);
+    _alicePk = _boundToValidPrivateKey(_alicePk);
+    address alice = vm.addr(_alicePk);
+
+    // Initiate withdrawal
+    vm.prank(lst);
+    uint256 withdrawalId = withdrawGate.initiateWithdrawal(_amount, alice);
+
+    // Warp time (but not enough)
+    vm.warp(block.timestamp + _earlyTime);
+
+    // Sign the withdrawal message
+    bytes memory signature = _signWithdrawalMessage(withdrawalId, _deadline, _alicePk);
+
+    // Attempt to complete withdrawal
+    vm.expectRevert(WithdrawGate.WithdrawGate__WithdrawalNotEligible.selector);
+    withdrawGate.completeWithdrawalOnBehalf(withdrawalId, _deadline, signature);
+  }
+
+  function testFuzz_RevertIf_ExpiredSignatureDeadline(
+    uint96 _amount,
+    uint256 _deadline,
+    uint256 _extraTime,
+    uint256 _alicePk
+  ) public {
+    _extraTime = _boundToReasonableExtraTime(_extraTime);
+    _deadline = _boundToUnreasonableDeadline(_deadline, _extraTime);
+    _alicePk = _boundToValidPrivateKey(_alicePk);
+    address alice = vm.addr(_alicePk);
+
+    // Initiate withdrawal
+    vm.prank(lst);
+    uint256 withdrawalId = withdrawGate.initiateWithdrawal(_amount, alice);
+
+    // Warp time
+    vm.warp(block.timestamp + initialDelay + _extraTime);
+
+    // Sign the withdrawal message
+    bytes memory signature = _signWithdrawalMessage(withdrawalId, _deadline, _alicePk);
+
+    // Attempt to complete withdrawal
+    vm.expectRevert(WithdrawGate.WithdrawGate__ExpiredDeadline.selector);
+    withdrawGate.completeWithdrawalOnBehalf(withdrawalId, _deadline, signature);
+  }
+}
+```

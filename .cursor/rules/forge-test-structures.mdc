@@ -1,0 +1,129 @@
+---
+description: This is a guide for writing Foundry tests and covers how to structure tests according to our conventions. It uses the AAA pattern.
+globs:
+alwaysApply: 
+---
+Great question. In Foundry, the “inside” of a test benefits from a consistent micro-structure so failures are obvious and reproducible. Here’s a practical pattern that scales:
+
+# The anatomy (inside each test)
+
+1. **Arrange (Given):** set preconditions
+2. **Act (When):** perform exactly one action you’re validating
+3. **Assert (Then):** check *one main claim* + any safety checks
+
+Keep each block visually separated with comments and group helpers below the test body. Prefer one major assertion per test; create more tests for other behaviors.
+
+# A tight template
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+import "forge-std/Test.sol";
+
+contract MyFeatureTest is Test {
+    // System Under Test (SUT)
+    MyToken token;
+    address alice = address(0xA11CE);
+    address bob   = address(0xB0B);
+
+    function setUp() public {
+        // minimal, deterministic environment
+        token = new MyToken();
+        vm.label(alice, "Alice");
+        vm.label(bob,   "Bob");
+        token.mint(alice, 1_000 ether);
+    }
+
+    function test_TransferMovesBalanceAndEmitsEvent() public {
+        // ---------- Arrange (Given)
+        vm.prank(alice);
+        uint256 amount = 100 ether;
+        uint256 aliceBefore = token.balanceOf(alice);
+        uint256 bobBefore   = token.balanceOf(bob);
+
+        // Expect the event *before* the act
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(alice, bob, amount);
+
+        // ---------- Act (When)
+        // keep the action to one meaningful call
+        token.transfer(bob, amount);
+
+        // ---------- Assert (Then)
+        assertEq(token.balanceOf(alice), aliceBefore - amount, "alice bal");
+        assertEq(token.balanceOf(bob),   bobBefore + amount,   "bob bal");
+    }
+
+    function test_RevertWhen_SenderHasInsufficientBalance() public {
+        // ---------- Arrange
+        vm.prank(bob);
+        uint256 amount = 1 ether;
+
+        // ---------- Assert revert (set expectation first)
+        vm.expectRevert("ERC20: transfer amount exceeds balance");
+
+        // ---------- Act
+        token.transfer(alice, amount);
+    }
+
+    // -------- Helpers (private/internal) ----------
+    // Keep common setup/expectation code out of the test body
+    function _mintTo(address to, uint256 amt) internal {
+        token.mint(to, amt);
+    }
+
+    // Event signature for expectEmit
+    event Transfer(address indexed from, address indexed to, uint256 value);
+}
+```
+
+# Fuzz/property tests (inside body)
+
+* **Bound inputs** to meaningful domains and **assume** invariants before acting.
+* Still keep AAA structure.
+
+```solidity
+function testFuzz_TransferConservesSupply(address to, uint256 amt) public {
+    // ---------- Arrange
+    vm.assume(to != address(0));
+    vm.assume(to != address(this));
+    amt = bound(amt, 0, token.balanceOf(alice)); // never overdraw
+    uint256 totalBefore = token.totalSupply();
+
+    vm.prank(alice);
+
+    // ---------- Act
+    token.transfer(to, amt);
+
+    // ---------- Assert
+    assertEq(token.totalSupply(), totalBefore);
+}
+```
+
+# Common assertions & expectations you’ll use
+
+* **Reverts:** `vm.expectRevert(<selector|message|bytes4>)`
+* **Events:** `vm.expectEmit(...)` then emit the expected event
+* **External calls:** `vm.expectCall(target, data)` (great for hook/proxy checks)
+* **Approx checks:** `assertApproxEqAbs/Rel(a, b, tol)`
+* **Time/blocks:** `vm.warp(ts)`, `vm.roll(blockNo)`
+* **Actors:** `vm.prank(addr)`, `vm.startPrank(addr)`/`vm.stopPrank()`
+* **State funding:** `deal(token, addr, amt)` (ERC20) or `vm.deal(addr, ethAmt)` (ETH)
+
+# Inside-test style tips
+
+* **One behavior per test.** If you find multiple “Then” claims, split the test.
+* **Name tests crisply:** `test_<WhatHappens>`, `test_RevertWhen_<Condition>`.
+* **Minimize branching in the Act.** If you need a scenario tree, create fixture helpers and keep each test’s Act to one call path.
+* **Label addresses** with `vm.label`—debugging is much easier.
+* **Deterministic setup** in `setUp()`; don’t hide randomness there.
+* **No hidden side effects** in assertions—helpers shouldn’t mutate state unless it’s an Arrange step.
+
+# When you need more than unit tests
+
+* **Scenario tests:** Build short “story” tests but still keep AAA inside each step or split into multiple tests.
+* **Invariant tests:** Put them in a separate test contract using Foundry’s invariant runner; keep unit tests focused and quick.
+* **Gas snapshots:** If you care about budgets, create separate gas tests using `forge test --gas-report` and avoid mixing with logic assertions.
+
+If you want, share a snippet of your current test and I’ll reorganize it into this pattern.
