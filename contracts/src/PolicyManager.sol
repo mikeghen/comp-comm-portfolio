@@ -60,7 +60,7 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
     /// @param userMint The MT tokens minted to the user.
     /// @param devMint The MT tokens minted to the dev.
     /// @param version The new prompt version.
-    event PromptEdited(
+    event PromptEdited( // @note What is version?
         address indexed editor,
         uint256 start,
         uint256 end,
@@ -69,7 +69,7 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
         uint256 costUSDC,
         uint256 userMint,
         uint256 devMint,
-        uint256 version // @note What is version?
+        uint256 version
     );
 
     /// @notice Initializes the PolicyManager contract.
@@ -115,7 +115,7 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
         // Calculate costs
         uint256 costUSDC = changed * EDIT_PRICE_PER_10_CHARS_USDC;
         uint256 userMint = changed * MT_PER_10CHARS_USER;
-        uint256 devMint = (userMint * DEV_BPS) / 10000; 
+        uint256 devMint = (userMint * DEV_BPS) / 10000;
 
         // Transfer USDC from user
         if (!IERC20(USDC).transferFrom(msg.sender, address(this), costUSDC)) {
@@ -133,17 +133,7 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
         promptVersion++;
 
         // Emit event
-        emit PromptEdited(
-            msg.sender,
-            start,
-            end,
-            replacementLen,
-            changed,
-            costUSDC,
-            userMint,
-            devMint,
-            promptVersion
-        );
+        emit PromptEdited(msg.sender, start, end, replacementLen, changed, costUSDC, userMint, devMint, promptVersion);
     }
 
     /// @notice Returns the current prompt and version.
@@ -165,11 +155,11 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
 
         bytes memory promptBytes = bytes(prompt);
         bytes memory slice = new bytes(end - start);
-        
+
         for (uint256 i = start; i < end; i++) {
             slice[i - start] = promptBytes[i];
         }
-        
+
         return string(slice);
     }
 
@@ -178,7 +168,11 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
     /// @return costUSDC The USDC cost of the edit.
     /// @return userMint The MT tokens that would be minted to the user.
     /// @return devMint The MT tokens that would be minted to the dev.
-    function previewEditCost(uint256 changed) external pure returns (uint256 costUSDC, uint256 userMint, uint256 devMint) {
+    function previewEditCost(uint256 changed)
+        external
+        pure
+        returns (uint256 costUSDC, uint256 userMint, uint256 devMint)
+    {
         costUSDC = changed * EDIT_PRICE_PER_10_CHARS_USDC;
         userMint = changed * MT_PER_10CHARS_USER;
         devMint = (userMint * DEV_BPS) / 10000;
@@ -198,27 +192,25 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
     function _applyEdit(uint256 start, uint256 end, string calldata replacement) internal {
         bytes memory promptBytes = bytes(prompt);
         bytes memory replacementBytes = bytes(replacement);
-        
+
         // Create new bytes array for the result
-        bytes memory newPrompt = new bytes(
-            promptBytes.length - (end - start) + replacementBytes.length
-        );
-        
+        bytes memory newPrompt = new bytes(promptBytes.length - (end - start) + replacementBytes.length);
+
         // Copy the part before the edit
         for (uint256 i = 0; i < start; i++) {
             newPrompt[i] = promptBytes[i];
         }
-        
+
         // Copy the replacement
         for (uint256 i = 0; i < replacementBytes.length; i++) {
             newPrompt[start + i] = replacementBytes[i];
         }
-        
+
         // Copy the part after the edit
         for (uint256 i = end; i < promptBytes.length; i++) {
             newPrompt[start + replacementBytes.length + (i - end)] = promptBytes[i];
         }
-        
+
         prompt = string(newPrompt);
     }
 }

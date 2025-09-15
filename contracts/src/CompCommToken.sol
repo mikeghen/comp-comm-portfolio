@@ -22,7 +22,6 @@ contract CompCommToken is ERC20, ERC20Burnable, AccessControl, Pausable {
     /// @notice Thrown when attempting to burn more tokens than allowed.
     error CompCommToken__InsufficientAllowance();
 
-
     /// @notice Role for minting new tokens (granted to MessageManager and PolicyManager).
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
@@ -80,7 +79,7 @@ contract CompCommToken is ERC20, ERC20Burnable, AccessControl, Pausable {
         if (msg.sender != account) {
             uint256 currentAllowance = allowance(account, msg.sender);
             if (currentAllowance < amount) revert CompCommToken__InsufficientAllowance();
-            
+
             // Reduce allowance
             _approve(account, msg.sender, currentAllowance - amount);
         }

@@ -47,7 +47,11 @@ contract PolicyManagerTest is Test {
         return bound(_length, 1, 1000);
     }
 
-    function _boundToReasonableEditRange(uint256 _start, uint256 _end, uint256 _promptLength) internal pure returns (uint256, uint256) {
+    function _boundToReasonableEditRange(uint256 _start, uint256 _end, uint256 _promptLength)
+        internal
+        pure
+        returns (uint256, uint256)
+    {
         _start = bound(_start, 0, _promptLength);
         _end = bound(_end, _start, _promptLength);
         return (_start, _end);
@@ -86,11 +90,7 @@ contract Constructor is PolicyManagerTest {
         assertEq(_policyManager.promptVersion(), 1);
     }
 
-    function testFuzz_RevertIf_UsdcAddressIsZero(
-        address _mtToken,
-        address _dev,
-        string memory _initialPrompt
-    ) public {
+    function testFuzz_RevertIf_UsdcAddressIsZero(address _mtToken, address _dev, string memory _initialPrompt) public {
         _assumeSafeAddress(_mtToken);
         _assumeSafeAddress(_dev);
 
@@ -98,11 +98,7 @@ contract Constructor is PolicyManagerTest {
         new PolicyManager(address(0), _mtToken, _dev, _initialPrompt);
     }
 
-    function testFuzz_RevertIf_MtTokenAddressIsZero(
-        address _usdc,
-        address _dev,
-        string memory _initialPrompt
-    ) public {
+    function testFuzz_RevertIf_MtTokenAddressIsZero(address _usdc, address _dev, string memory _initialPrompt) public {
         _assumeSafeAddress(_usdc);
         _assumeSafeAddress(_dev);
 
@@ -110,11 +106,7 @@ contract Constructor is PolicyManagerTest {
         new PolicyManager(_usdc, address(0), _dev, _initialPrompt);
     }
 
-    function testFuzz_RevertIf_DevAddressIsZero(
-        address _usdc,
-        address _mtToken,
-        string memory _initialPrompt
-    ) public {
+    function testFuzz_RevertIf_DevAddressIsZero(address _usdc, address _mtToken, string memory _initialPrompt) public {
         _assumeSafeAddress(_usdc);
         _assumeSafeAddress(_mtToken);
 
@@ -126,7 +118,7 @@ contract Constructor is PolicyManagerTest {
 contract EditPrompt is PolicyManagerTest {
     function setUp() public override {
         super.setUp();
-        
+
         // Fund user with USDC and approve PolicyManager
         address user = makeAddr("User");
         usdc.mint(user, 1000e6); // 1000 USDC
@@ -134,11 +126,7 @@ contract EditPrompt is PolicyManagerTest {
         usdc.approve(address(policyManager), type(uint256).max);
     }
 
-    function testFuzz_EditsPromptWithValidRange(
-        uint256 _start,
-        uint256 _end,
-        string memory _replacement
-    ) public {
+    function testFuzz_EditsPromptWithValidRange(uint256 _start, uint256 _end, string memory _replacement) public {
         address user = makeAddr("User");
         usdc.mint(user, 1000e6);
         vm.prank(user);
@@ -150,7 +138,7 @@ contract EditPrompt is PolicyManagerTest {
         _replacement = string(abi.encodePacked(_replacement, "x")); // Ensure non-empty
         bytes memory replacementBytes = bytes(_replacement);
         uint256 replacementLength = replacementBytes.length;
-        
+
         // Adjust end to match replacement length
         _end = _start + replacementLength;
         vm.assume(_end <= promptLength);
@@ -172,11 +160,7 @@ contract EditPrompt is PolicyManagerTest {
         assertEq(mtToken.balanceOf(dev), expectedDevMint);
     }
 
-    function testFuzz_EmitsPromptEditedEvent(
-        uint256 _start,
-        uint256 _end,
-        string memory _replacement
-    ) public {
+    function testFuzz_EmitsPromptEditedEvent(uint256 _start, uint256 _end, string memory _replacement) public {
         address user = makeAddr("User");
         usdc.mint(user, 1000e6);
         vm.prank(user);
@@ -212,11 +196,7 @@ contract EditPrompt is PolicyManagerTest {
         policyManager.editPrompt(_start, _end, _replacement);
     }
 
-    function testFuzz_RevertIf_InvalidEditRange(
-        uint256 _start,
-        uint256 _end,
-        string memory _replacement
-    ) public {
+    function testFuzz_RevertIf_InvalidEditRange(uint256 _start, uint256 _end, string memory _replacement) public {
         address user = makeAddr("User");
         usdc.mint(user, 1000e6);
         vm.prank(user);
@@ -224,7 +204,7 @@ contract EditPrompt is PolicyManagerTest {
 
         string memory currentPrompt = policyManager.prompt();
         uint256 promptLength = bytes(currentPrompt).length;
-        
+
         // Make start > end or end > promptLength
         _start = bound(_start, 0, type(uint256).max);
         _end = bound(_end, 0, type(uint256).max);
@@ -235,11 +215,9 @@ contract EditPrompt is PolicyManagerTest {
         policyManager.editPrompt(_start, _end, _replacement);
     }
 
-    function testFuzz_RevertIf_InvalidReplacementLength(
-        uint256 _start,
-        uint256 _end,
-        string memory _replacement
-    ) public {
+    function testFuzz_RevertIf_InvalidReplacementLength(uint256 _start, uint256 _end, string memory _replacement)
+        public
+    {
         address user = makeAddr("User");
         usdc.mint(user, 1000e6);
         vm.prank(user);
@@ -248,7 +226,7 @@ contract EditPrompt is PolicyManagerTest {
         string memory currentPrompt = policyManager.prompt();
         uint256 promptLength = bytes(currentPrompt).length;
         (_start, _end) = _boundToReasonableEditRange(_start, _end, promptLength);
-        
+
         // Make replacement length not match the range
         bytes memory replacementBytes = bytes(_replacement);
         uint256 replacementLength = replacementBytes.length;
@@ -259,13 +237,11 @@ contract EditPrompt is PolicyManagerTest {
         policyManager.editPrompt(_start, _end, _replacement);
     }
 
-    function testFuzz_RevertIf_InsufficientUSDCBalance(
-        uint256 _start,
-        uint256 _end,
-        string memory _replacement
-    ) public {
+    function testFuzz_RevertIf_InsufficientUSDCBalance(uint256 _start, uint256 _end, string memory _replacement)
+        public
+    {
         address user = makeAddr("User");
-        
+
         string memory currentPrompt = policyManager.prompt();
         uint256 promptLength = bytes(currentPrompt).length;
         (_start, _end) = _boundToReasonableEditRange(_start, _end, promptLength);
@@ -277,7 +253,7 @@ contract EditPrompt is PolicyManagerTest {
 
         uint256 expectedChanged = (replacementLength + 9) / 10;
         uint256 expectedCostUSDC = expectedChanged * policyManager.EDIT_PRICE_PER_10_CHARS_USDC();
-        
+
         // Give user less USDC than needed
         usdc.mint(user, expectedCostUSDC - 1);
         vm.prank(user);
@@ -288,11 +264,7 @@ contract EditPrompt is PolicyManagerTest {
         policyManager.editPrompt(_start, _end, _replacement);
     }
 
-    function testFuzz_AppliesEditCorrectly(
-        uint256 _start,
-        uint256 _end,
-        string memory _replacement
-    ) public {
+    function testFuzz_AppliesEditCorrectly(uint256 _start, uint256 _end, string memory _replacement) public {
         address user = makeAddr("User");
         usdc.mint(user, 1000e6);
         vm.prank(user);
@@ -310,17 +282,17 @@ contract EditPrompt is PolicyManagerTest {
         // Calculate expected result
         bytes memory promptBytes = bytes(currentPrompt);
         bytes memory expectedResult = new bytes(promptLength - (_end - _start) + replacementLength);
-        
+
         // Copy part before edit
         for (uint256 i = 0; i < _start; i++) {
             expectedResult[i] = promptBytes[i];
         }
-        
+
         // Copy replacement
         for (uint256 i = 0; i < replacementLength; i++) {
             expectedResult[_start + i] = replacementBytes[i];
         }
-        
+
         // Copy part after edit
         for (uint256 i = _end; i < promptLength; i++) {
             expectedResult[_start + replacementLength + (i - _end)] = promptBytes[i];
@@ -340,11 +312,7 @@ contract GetPrompt is PolicyManagerTest {
         assertEq(version, 1);
     }
 
-    function testFuzz_ReturnsUpdatedPromptAfterEdit(
-        uint256 _start,
-        uint256 _end,
-        string memory _replacement
-    ) public {
+    function testFuzz_ReturnsUpdatedPromptAfterEdit(uint256 _start, uint256 _end, string memory _replacement) public {
         address user = makeAddr("User");
         usdc.mint(user, 1000e6);
         vm.prank(user);
@@ -369,19 +337,16 @@ contract GetPrompt is PolicyManagerTest {
 }
 
 contract GetPromptSlice is PolicyManagerTest {
-    function testFuzz_ReturnsCorrectSlice(
-        uint256 _start,
-        uint256 _end
-    ) public {
+    function testFuzz_ReturnsCorrectSlice(uint256 _start, uint256 _end) public {
         string memory currentPrompt = policyManager.prompt();
         uint256 promptLength = bytes(currentPrompt).length;
         (_start, _end) = _boundToReasonableEditRange(_start, _end, promptLength);
 
         string memory slice = policyManager.getPromptSlice(_start, _end);
-        
+
         bytes memory promptBytes = bytes(currentPrompt);
         bytes memory expectedSlice = new bytes(_end - _start);
-        
+
         for (uint256 i = _start; i < _end; i++) {
             expectedSlice[i - _start] = promptBytes[i];
         }
@@ -389,13 +354,10 @@ contract GetPromptSlice is PolicyManagerTest {
         assertEq(slice, string(expectedSlice));
     }
 
-    function testFuzz_RevertIf_InvalidSliceRange(
-        uint256 _start,
-        uint256 _end
-    ) public {
+    function testFuzz_RevertIf_InvalidSliceRange(uint256 _start, uint256 _end) public {
         string memory currentPrompt = policyManager.prompt();
         uint256 promptLength = bytes(currentPrompt).length;
-        
+
         // Make start > end or end > promptLength
         _start = bound(_start, 0, type(uint256).max);
         _end = bound(_end, 0, type(uint256).max);
@@ -409,13 +371,13 @@ contract GetPromptSlice is PolicyManagerTest {
 contract PreviewEditCost is PolicyManagerTest {
     function testFuzz_CalculatesCorrectCosts(uint256 _changed) public {
         _changed = _boundToReasonableCost(_changed);
-        
+
         (uint256 costUSDC, uint256 userMint, uint256 devMint) = policyManager.previewEditCost(_changed);
-        
+
         uint256 expectedCostUSDC = _changed * policyManager.EDIT_PRICE_PER_10_CHARS_USDC();
         uint256 expectedUserMint = _changed * policyManager.MT_PER_10CHARS_USER();
         uint256 expectedDevMint = (expectedUserMint * policyManager.DEV_BPS()) / 10000;
-        
+
         assertEq(costUSDC, expectedCostUSDC);
         assertEq(userMint, expectedUserMint);
         assertEq(devMint, expectedDevMint);
@@ -423,7 +385,7 @@ contract PreviewEditCost is PolicyManagerTest {
 
     function test_CalculatesCostsForSpecificValues() public {
         (uint256 costUSDC, uint256 userMint, uint256 devMint) = policyManager.previewEditCost(1);
-        
+
         assertEq(costUSDC, 1_000_000); // 1 USDC
         assertEq(userMint, 100_000_000_000_000_000); // 0.1 MT
         assertEq(devMint, 20_000_000_000_000_000); // 0.02 MT (20% of 0.1)
@@ -431,7 +393,7 @@ contract PreviewEditCost is PolicyManagerTest {
 
     function test_CalculatesCostsForMultipleUnits() public {
         (uint256 costUSDC, uint256 userMint, uint256 devMint) = policyManager.previewEditCost(5);
-        
+
         assertEq(costUSDC, 5_000_000); // 5 USDC
         assertEq(userMint, 500_000_000_000_000_000); // 0.5 MT
         assertEq(devMint, 100_000_000_000_000_000); // 0.1 MT (20% of 0.5)
@@ -446,17 +408,17 @@ contract PromptVersion is PolicyManagerTest {
         usdc.approve(address(policyManager), type(uint256).max);
 
         uint256 initialVersion = policyManager.promptVersion();
-        
+
         // First edit
         vm.prank(user);
         policyManager.editPrompt(0, 1, "X");
         assertEq(policyManager.promptVersion(), initialVersion + 1);
-        
+
         // Second edit
         vm.prank(user);
         policyManager.editPrompt(1, 2, "Y");
         assertEq(policyManager.promptVersion(), initialVersion + 2);
-        
+
         // Third edit
         vm.prank(user);
         policyManager.editPrompt(2, 3, "Z");
@@ -471,7 +433,7 @@ contract PromptVersion is PolicyManagerTest {
 
         _editCount = bound(_editCount, 1, 10);
         uint256 initialVersion = policyManager.promptVersion();
-        
+
         for (uint256 i = 0; i < _editCount; i++) {
             vm.prank(user);
             policyManager.editPrompt(i, i + 1, "X");
@@ -501,7 +463,7 @@ contract MockERC20 is IERC20 {
     string public symbol;
     uint8 public decimals;
     uint256 public totalSupply;
-    
+
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
 
