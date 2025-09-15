@@ -16,12 +16,6 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
     /// @notice Thrown when the replacement length doesn't match the range.
     error PolicyManager__InvalidReplacementLength();
 
-    /// @notice Thrown when the USDC transfer fails.
-    error PolicyManager__TransferFailed();
-
-    /// @notice Thrown when the MT token mint fails.
-    error PolicyManager__MintFailed();
-
     /// @notice The investment policy stored as ASCII text.
     string public prompt;
 
@@ -59,8 +53,8 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
     /// @param costUSDC The USDC cost of the edit.
     /// @param userMint The MT tokens minted to the user.
     /// @param devMint The MT tokens minted to the dev.
-    /// @param version The new prompt version.
-    event PromptEdited( // @note What is version?
+    /// @param version The new prompt version, incremented on each edit.
+    event PromptEdited(
         address indexed editor,
         uint256 start,
         uint256 end,
@@ -118,9 +112,7 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
         uint256 devMint = (userMint * DEV_BPS) / 10000;
 
         // Transfer USDC from user
-        if (!IERC20(USDC).transferFrom(msg.sender, address(this), costUSDC)) {
-            revert PolicyManager__TransferFailed();
-        }
+        IERC20(USDC).transferFrom(msg.sender, address(this), costUSDC);
 
         // Mint MT tokens to user and dev
         _mintMT(msg.sender, userMint);
