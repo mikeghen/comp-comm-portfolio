@@ -14,6 +14,9 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
     steps:
       - uses: actions/checkout@v3
 
@@ -27,6 +30,9 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
     steps:
       - uses: actions/checkout@v3
 
@@ -40,6 +46,12 @@ jobs:
     runs-on: ubuntu-latest
     env:
       FOUNDRY_PROFILE: coverage
+    permissions:
+      contents: read
+      pull-requests: write
+    defaults:
+      run:
+        working-directory: contracts
     steps:
       - uses: actions/checkout@v3
 
@@ -59,7 +71,7 @@ jobs:
       - name: Filter directories
         run: |
           sudo apt update && sudo apt install -y lcov
-          lcov --remove lcov.info 'test/*' 'script/*' --output-file lcov.info --rc lcov_branch_coverage=1
+          lcov --ignore-errors unused --remove lcov.info 'test/*' 'script/*' --output-file lcov.info --rc lcov_branch_coverage=1
 
       # This step posts a detailed coverage report as a comment and deletes previous comments on
       # each push. The below step is used to fail coverage if the specified coverage threshold is
@@ -70,18 +82,21 @@ jobs:
         if: github.event_name == 'pull_request' # This action fails when ran outside of a pull request.
         uses: romeovs/lcov-reporter-action@v0.3.1
         with:
-          delete-old-comments: true
-          lcov-file: ./lcov.info
+          delete-old-comments: false  # Set to false to avoid permission issues
+          lcov-file: contracts/lcov.info
           github-token: ${{ secrets.GITHUB_TOKEN }} # Adds a coverage summary comment to the PR.
 
       - name: Verify minimum coverage
         uses: zgosalvez/github-actions-report-lcov@v2
         with:
-          coverage-files: ./lcov.info
+          coverage-files: contracts/lcov.info
           minimum-coverage: 100 # Set coverage threshold.
 
   lint:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
     steps:
       - uses: actions/checkout@v3
 
