@@ -177,7 +177,6 @@ const BorrowList: React.FC = () => {
         ) : parseFloat(borrowBalance) > 0 ? (
           <ListGroup.Item className="d-flex justify-content-between align-items-center">
             <div className="d-flex align-items-center">
-              <div className="asset-icon me-3">USDC</div>
               <div>
                 <div>USDC</div>
                 <div className="text-muted small">{formattedBorrowAPR} APR</div>

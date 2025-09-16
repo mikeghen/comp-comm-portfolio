@@ -80,7 +80,7 @@ const WalletAssetsList: React.FC = () => {
         balanceUSD,
         contractAddress,
       };
-    }).filter(Boolean);
+    }).filter(asset => asset && parseFloat(asset.balance) > 0);
   }, [contracts, assetBalanceHooks, blockNumber]);
   
   // Update wallet assets when processed assets change

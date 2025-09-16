@@ -503,16 +503,6 @@ code {
     min-width: 120px; /* Prevent squeezing too much */
 }
 
-.asset-icon {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background-color: #e6f7ff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.8rem;
-}
 
 .asset-details {
     display: flex;
