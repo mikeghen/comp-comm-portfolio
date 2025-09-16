@@ -77,16 +77,16 @@ contract VaultManagerTest is Test {
 contract Constructor is VaultManagerTest {
     function test_SetsConfigurationParameters() public view {
         // lockStart and unlockTimestamp
-        uint256 lockStart = vault.lockStart();
+        uint256 lockStart = vault.LOCK_START();
         assertTrue(lockStart <= block.timestamp);
-        assertEq(vault.unlockTimestamp(), lockStart + vault.LOCK_DURATION());
+        assertEq(vault.UNLOCK_TIMESTAMP(), lockStart + vault.LOCK_DURATION());
 
         // Addresses
-        assertEq(vault.usdc(), address(usdc));
-        assertEq(vault.weth(), address(weth));
+        assertEq(vault.USDC(), address(usdc));
+        assertEq(vault.WETH(), address(weth));
         assertEq(vault.mtToken(), address(mtToken));
-        assertEq(vault.uniswapV3Router(), address(router));
-        assertEq(vault.cometRewards(), address(cometRewards));
+        assertEq(vault.UNISWAP_V3_ROUTER(), address(router));
+        assertEq(vault.COMET_REWARDS(), address(cometRewards));
 
         // Access control
         assertEq(vault.owner(), owner);
@@ -112,7 +112,6 @@ contract SwapExactInputV3 is VaultManagerTest {
                 tokenOut: address(weth),
                 fee: 3000,
                 recipient: address(vault),
-                deadline: block.timestamp,
                 amountIn: amountIn,
                 amountOutMinimum: 0,
                 sqrtPriceLimitX96: 0
@@ -141,7 +140,6 @@ contract SwapExactInputV3 is VaultManagerTest {
                 tokenOut: address(weth),
                 fee: 3000,
                 recipient: address(vault),
-                deadline: block.timestamp,
                 amountIn: 1e6,
                 amountOutMinimum: 0,
                 sqrtPriceLimitX96: 0
@@ -151,7 +149,7 @@ contract SwapExactInputV3 is VaultManagerTest {
 
     function test_RevertIf_PostUnlock_SwapNotToWETH() public {
         // ---- Arrange
-        vm.warp(vault.unlockTimestamp() + 1);
+        vm.warp(vault.UNLOCK_TIMESTAMP() + 1);
         _fundVault(address(usdc), 1e6);
 
         // ---- Assert
@@ -165,7 +163,6 @@ contract SwapExactInputV3 is VaultManagerTest {
                 tokenOut: address(usdc),
                 fee: 3000,
                 recipient: address(vault),
-                deadline: block.timestamp,
                 amountIn: 1e6,
                 amountOutMinimum: 0,
                 sqrtPriceLimitX96: 0
@@ -175,7 +172,7 @@ contract SwapExactInputV3 is VaultManagerTest {
 
     function test_Allows_PostUnlock_SwapToWETH() public {
         // ---- Arrange
-        vm.warp(vault.unlockTimestamp() + 1);
+        vm.warp(vault.UNLOCK_TIMESTAMP() + 1);
         _fundVault(address(usdc), 2e6);
 
         // ---- Act
@@ -186,7 +183,6 @@ contract SwapExactInputV3 is VaultManagerTest {
                 tokenOut: address(weth),
                 fee: 3000,
                 recipient: address(vault),
-                deadline: block.timestamp,
                 amountIn: 2e6,
                 amountOutMinimum: 0,
                 sqrtPriceLimitX96: 0
@@ -280,7 +276,7 @@ contract GetCurrentPhase is VaultManagerTest {
 
     function test_ReturnsConsolidationPostUnlockWithNonWethBalance() public {
         // ---- Arrange
-        vm.warp(vault.unlockTimestamp() + 1);
+        vm.warp(vault.UNLOCK_TIMESTAMP() + 1);
         _fundVault(address(usdc), 1e6);
 
         // ---- Assert
@@ -290,7 +286,7 @@ contract GetCurrentPhase is VaultManagerTest {
 
     function test_ReturnsRedemptionPostUnlockWhenConsolidated() public {
         // ---- Arrange
-        vm.warp(vault.unlockTimestamp() + 1);
+        vm.warp(vault.UNLOCK_TIMESTAMP() + 1);
         // no non-WETH balances and no comet position
 
         // ---- Assert
@@ -309,7 +305,7 @@ contract RedeemWETH is VaultManagerTest {
 
     function test_RedeemsProRataWETHInRedemptionPhase() public {
         // ---- Arrange
-        vm.warp(vault.unlockTimestamp() + 1);
+        vm.warp(vault.UNLOCK_TIMESTAMP() + 1);
         uint256 totalWeth = 100 ether;
         _fundVault(address(weth), totalWeth);
 
@@ -444,7 +440,6 @@ contract Pause is VaultManagerTest {
                 tokenOut: address(weth),
                 fee: 3000,
                 recipient: address(vault),
-                deadline: block.timestamp,
                 amountIn: 1e6,
                 amountOutMinimum: 0,
                 sqrtPriceLimitX96: 0
@@ -469,7 +464,6 @@ contract Pause is VaultManagerTest {
                 tokenOut: address(weth),
                 fee: 3000,
                 recipient: address(vault),
-                deadline: block.timestamp,
                 amountIn: 1e6,
                 amountOutMinimum: 0,
                 sqrtPriceLimitX96: 0
@@ -484,7 +478,7 @@ contract Pause is VaultManagerTest {
 contract Sweep is VaultManagerTest {
     function test_RevertIf_SweepingWETHDuringRedemption() public {
         // ---- Arrange
-        vm.warp(vault.unlockTimestamp() + 1);
+        vm.warp(vault.UNLOCK_TIMESTAMP() + 1);
         _fundVault(address(weth), 5 ether);
 
         // ---- Assert

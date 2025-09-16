@@ -8,36 +8,17 @@ import {ReentrancyGuard} from "openzeppelin/utils/ReentrancyGuard.sol";
 import {Pausable} from "openzeppelin/utils/Pausable.sol";
 import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
 import {CompCommToken} from "src/CompCommToken.sol";
+import {ISwapRouter} from "src/interfaces/ISwapRouter.sol";
+import {IComet} from "src/interfaces/IComet.sol";
+import {ICometRewards} from "src/interfaces/ICometRewards.sol";
+import {SafeERC20} from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
-/// @dev Minimal interfaces per docs/IMPLEMENTATION_SPEC.md
-interface ISwapRouter {
-    struct ExactInputSingleParams {
-        address tokenIn;
-        address tokenOut;
-        uint24 fee;
-        address recipient;
-        uint256 deadline;
-        uint256 amountIn;
-        uint256 amountOutMinimum;
-        uint160 sqrtPriceLimitX96;
-    }
-
-    function exactInputSingle(ExactInputSingleParams calldata params) external payable returns (uint256 amountOut);
-}
-
-interface IComet {
-    function supply(address asset, uint256 amount) external;
-    function withdraw(address asset, uint256 amount) external;
-    function balanceOf(address account) external view returns (uint256);
-}
-
-interface ICometRewards {
-    function claimTo(address comet, address to, bool shouldAccrue) external returns (uint256);
-}
+// interfaces moved to src/interfaces
 
 /// @title VaultManager
 /// @notice Manages portfolio funds with timelock, DeFi integrations, and redemption of WETH for MT holders.
 contract VaultManager is Ownable2Step, AccessControl, ReentrancyGuard, Pausable {
+    using SafeERC20 for IERC20;
     // --------------------
     // Errors
     // --------------------
@@ -57,25 +38,25 @@ contract VaultManager is Ownable2Step, AccessControl, ReentrancyGuard, Pausable 
     // Constants & Immutables
     // --------------------
     /// @notice Deployment timestamp when timelock begins.
-    uint256 public immutable lockStart;
+    uint256 public immutable LOCK_START;
 
     /// @notice Lock duration: 46,656,000 seconds (18 months).
     uint256 public constant LOCK_DURATION = 46_656_000;
 
-    /// @notice Timestamp when funds unlock (lockStart + LOCK_DURATION).
-    uint256 public immutable unlockTimestamp;
+    /// @notice Timestamp when funds unlock (LOCK_START + LOCK_DURATION).
+    uint256 public immutable UNLOCK_TIMESTAMP;
 
     /// @notice WETH token address.
-    address public immutable weth;
+    address public immutable WETH;
 
     /// @notice USDC token address.
-    address public immutable usdc;
+    address public immutable USDC;
 
     /// @notice Uniswap v3 router address.
-    address public immutable uniswapV3Router;
+    address public immutable UNISWAP_V3_ROUTER;
 
     /// @notice Compound v3 CometRewards address.
-    address public immutable cometRewards;
+    address public immutable COMET_REWARDS;
 
     // --------------------
     // Storage
@@ -153,13 +134,13 @@ contract VaultManager is Ownable2Step, AccessControl, ReentrancyGuard, Pausable 
             revert VaultManager__InvalidAddress();
         }
 
-        lockStart = block.timestamp;
-        unlockTimestamp = lockStart + LOCK_DURATION;
+        LOCK_START = block.timestamp;
+        UNLOCK_TIMESTAMP = LOCK_START + LOCK_DURATION;
 
-        usdc = _usdc;
-        weth = _weth;
-        uniswapV3Router = _uniswapV3Router;
-        cometRewards = _cometRewards;
+        USDC = _usdc;
+        WETH = _weth;
+        UNISWAP_V3_ROUTER = _uniswapV3Router;
+        COMET_REWARDS = _cometRewards;
         mtToken = _mtToken;
         agent = _agent;
 
@@ -189,12 +170,11 @@ contract VaultManager is Ownable2Step, AccessControl, ReentrancyGuard, Pausable 
         Phase phase = getCurrentPhase();
         if (phase != Phase.LOCKED) {
             // After unlock, only allow consolidations into WETH
-            if (paramsIn.tokenOut != weth) revert VaultManager__InvalidPhase();
+            if (paramsIn.tokenOut != WETH) revert VaultManager__InvalidPhase();
         }
 
-        // Approve router to pull tokenIn from this contract
-        IERC20(paramsIn.tokenIn).approve(uniswapV3Router, 0);
-        IERC20(paramsIn.tokenIn).approve(uniswapV3Router, paramsIn.amountIn);
+        // Ensure sufficient allowance for router
+        _approveIfNeeded(paramsIn.tokenIn, UNISWAP_V3_ROUTER, paramsIn.amountIn);
 
         // Enforce recipient as this vault for safety regardless of provided value
         ISwapRouter.ExactInputSingleParams memory fwd = ISwapRouter.ExactInputSingleParams({
@@ -202,13 +182,12 @@ contract VaultManager is Ownable2Step, AccessControl, ReentrancyGuard, Pausable 
             tokenOut: paramsIn.tokenOut,
             fee: paramsIn.fee,
             recipient: address(this),
-            deadline: block.timestamp,
             amountIn: paramsIn.amountIn,
             amountOutMinimum: paramsIn.amountOutMinimum,
             sqrtPriceLimitX96: paramsIn.sqrtPriceLimitX96
         });
 
-        amountOut = ISwapRouter(uniswapV3Router).exactInputSingle(fwd);
+        amountOut = ISwapRouter(UNISWAP_V3_ROUTER).exactInputSingle(fwd);
 
         emit SwapExecuted(paramsIn.tokenIn, paramsIn.tokenOut, paramsIn.amountIn, amountOut);
     }
@@ -223,11 +202,17 @@ contract VaultManager is Ownable2Step, AccessControl, ReentrancyGuard, Pausable 
         if (!allowedAssets[asset]) revert VaultManager__AssetNotAllowed();
         if (!allowedComets[comet] || comet == address(0)) revert VaultManager__CometNotAllowed();
 
-        IERC20(asset).approve(comet, 0);
-        IERC20(asset).approve(comet, amount);
+        _approveIfNeeded(asset, comet, amount);
         IComet(comet).supply(asset, amount);
 
         emit CometSupplied(comet, asset, amount);
+    }
+
+    function _approveIfNeeded(address token, address spender, uint256 required) internal {
+        uint256 current = IERC20(token).allowance(address(this), spender);
+        if (current < required) {
+            IERC20(token).safeIncreaseAllowance(spender, required - current);
+        }
     }
 
     /// @notice Withdraw an asset from its configured Comet market. Matches Comet's function name/signature.
@@ -253,7 +238,7 @@ contract VaultManager is Ownable2Step, AccessControl, ReentrancyGuard, Pausable 
         if (!allowedComets[comet]) revert VaultManager__CometNotAllowed();
         if (to == address(0)) revert VaultManager__InvalidAddress();
 
-        uint256 claimed = ICometRewards(cometRewards).claimTo(comet, to, true);
+        uint256 claimed = ICometRewards(COMET_REWARDS).claimTo(comet, to, true);
         emit CompClaimed(comet, to, claimed);
         return claimed;
     }
@@ -263,7 +248,7 @@ contract VaultManager is Ownable2Step, AccessControl, ReentrancyGuard, Pausable 
     // --------------------
     /// @notice Return current phase based on timestamp and consolidation status.
     function getCurrentPhase() public view returns (Phase) {
-        if (block.timestamp < unlockTimestamp) {
+        if (block.timestamp < UNLOCK_TIMESTAMP) {
             return Phase.LOCKED;
         }
 
@@ -284,7 +269,7 @@ contract VaultManager is Ownable2Step, AccessControl, ReentrancyGuard, Pausable 
         uint256 assetCount = _assetList.length;
         for (uint256 i = 0; i < assetCount; i++) {
             address token = _assetList[i];
-            if (token != weth && allowedAssets[token]) {
+            if (token != WETH && allowedAssets[token]) {
                 if (IERC20(token).balanceOf(address(this)) > 0) {
                     return false;
                 }
@@ -309,14 +294,14 @@ contract VaultManager is Ownable2Step, AccessControl, ReentrancyGuard, Pausable 
         if (getCurrentPhase() != Phase.REDEMPTION) revert VaultManager__InvalidPhase();
 
         // Calculate pro-rata based on pre-burn total supply
-        uint256 wethBal = IERC20(weth).balanceOf(address(this));
+        uint256 wethBal = IERC20(WETH).balanceOf(address(this));
         uint256 ts = CompCommToken(mtToken).totalSupply();
         uint256 wethOut = (wethBal * mtAmount) / ts;
 
         // Burn MT from sender using Vault's burner role
         CompCommToken(mtToken).burnFrom(msg.sender, mtAmount);
 
-        IERC20(weth).transfer(to, wethOut);
+        IERC20(WETH).transfer(to, wethOut);
 
         emit Redeemed(msg.sender, to, mtAmount, wethOut);
     }
@@ -376,7 +361,7 @@ contract VaultManager is Ownable2Step, AccessControl, ReentrancyGuard, Pausable 
         if (to == address(0) || token == address(0)) revert VaultManager__InvalidAddress();
 
         Phase phase = getCurrentPhase();
-        if (phase == Phase.REDEMPTION && token == weth) {
+        if (phase == Phase.REDEMPTION && token == WETH) {
             revert VaultManager__SweepRestricted();
         }
 
