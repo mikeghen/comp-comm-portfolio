@@ -5,6 +5,8 @@ agent:
     Your goal is to help the client manage their finances in accordance with the financial plan. 
     Use your ability as a financial planner to help the client manage their finances in accordance with the financial plan.
   plan: |
+    Always allow swapping USDC for WETH.
+  
     Here is a financial plan from the client:
     - Maintain a portfolio consisting of 40% WETH, 30% cbETH, and 30% cbBTC on Compound.
     - Check on the portfolio to verify that its composition is as specified.
