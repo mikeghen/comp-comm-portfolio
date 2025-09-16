@@ -6,7 +6,8 @@ import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
 import {IAccessControl} from "openzeppelin/access/IAccessControl.sol";
 import {Pausable} from "openzeppelin/utils/Pausable.sol";
 
-import {VaultManager, ISwapRouter} from "src/VaultManager.sol";
+import {VaultManager} from "src/VaultManager.sol";
+import {ISwapRouter} from "src/interfaces/ISwapRouter.sol";
 import {CompCommToken} from "src/CompCommToken.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockSwapRouter} from "test/mocks/MockSwapRouter.sol";
@@ -95,14 +96,43 @@ contract Constructor is VaultManagerTest {
 }
 
 contract SwapExactInputV3 is VaultManagerTest {
+    function test_RevertIf_AmountZero() public {
+        vm.expectRevert(VaultManager.VaultManager__AmountZero.selector);
+        vm.prank(owner);
+        vault.exactInputSingle(
+            ISwapRouter.ExactInputSingleParams({
+                tokenIn: address(usdc),
+                tokenOut: address(weth),
+                fee: 3000,
+                recipient: address(vault),
+                amountIn: 0,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            })
+        );
+    }
+
+    function test_RevertIf_TokenOutNotWETH_PostUnlock() public {
+        vm.warp(vault.UNLOCK_TIMESTAMP() + 1);
+        _fundVault(address(usdc), 1e6);
+        vm.expectRevert(VaultManager.VaultManager__InvalidPhase.selector);
+        vm.prank(owner);
+        vault.exactInputSingle(
+            ISwapRouter.ExactInputSingleParams({
+                tokenIn: address(usdc),
+                tokenOut: address(usdc),
+                fee: 3000,
+                recipient: address(vault),
+                amountIn: 1,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            })
+        );
+    }
     function test_SwapsInLockedPhase() public {
         // ---- Arrange
         uint256 amountIn = 1_000_000; // 1 USDC
         _fundVault(address(usdc), amountIn);
-
-        // Expect event
-        vm.expectEmit(true, true, true, true);
-        emit VaultManager.SwapExecuted(address(usdc), address(weth), amountIn, amountIn * 2);
 
         // ---- Act
         vm.prank(owner);
@@ -121,6 +151,29 @@ contract SwapExactInputV3 is VaultManagerTest {
         // ---- Assert
         assertEq(usdc.balanceOf(address(vault)), 0);
         assertEq(weth.balanceOf(address(vault)), amountIn * 2);
+    }
+
+    function test_EmitsSwapExecutedEvent() public {
+        // ---- Arrange
+        uint256 amountIn = 2_000_000;
+        _fundVault(address(usdc), amountIn);
+
+        vm.expectEmit();
+        emit VaultManager.SwapExecuted(address(usdc), address(weth), amountIn, amountIn * 2);
+
+        // ---- Act (event only)
+        vm.prank(owner);
+        vault.exactInputSingle(
+            ISwapRouter.ExactInputSingleParams({
+                tokenIn: address(usdc),
+                tokenOut: address(weth),
+                fee: 3000,
+                recipient: address(vault),
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            })
+        );
     }
 
     function testFuzz_RevertIf_TokenNotAllowed(address _token) public {
@@ -195,13 +248,25 @@ contract SwapExactInputV3 is VaultManagerTest {
 }
 
 contract Supply is VaultManagerTest {
+    function test_RevertIf_AmountZero() public {
+        vm.expectRevert(VaultManager.VaultManager__AmountZero.selector);
+        vm.prank(owner);
+        vault.supply(address(usdc), 0);
+    }
+
+    function test_RevertIf_CometNotAllowedOrUnset() public {
+        // remove existing mapping by setting to zero through expect revert on setAssetComet with zero
+        address otherAsset = makeAddr("OtherAsset");
+        vm.prank(owner);
+        vault.setAllowedAsset(otherAsset, true);
+        vm.expectRevert(VaultManager.VaultManager__CometNotAllowed.selector);
+        vm.prank(owner);
+        vault.supply(otherAsset, 1);
+    }
     function test_DepositsAssetToComet() public {
         // ---- Arrange
         uint256 amount = 5e6;
         _fundVault(address(usdc), amount);
-
-        vm.expectEmit(true, true, true, true);
-        emit VaultManager.CometSupplied(address(comet), address(usdc), amount);
 
         // ---- Act
         vm.prank(owner);
@@ -210,6 +275,19 @@ contract Supply is VaultManagerTest {
         // ---- Assert
         assertEq(usdc.balanceOf(address(vault)), 0);
         assertEq(comet.balanceOf(address(vault)), amount);
+    }
+
+    function test_EmitsCometSuppliedEvent() public {
+        // ---- Arrange
+        uint256 amount = 7e6;
+        _fundVault(address(usdc), amount);
+
+        vm.expectEmit();
+        emit VaultManager.CometSupplied(address(comet), address(usdc), amount);
+
+        // ---- Act (event only)
+        vm.prank(owner);
+        vault.supply(address(usdc), amount);
     }
 
     function testFuzz_RevertIf_AssetNotAllowed(address _asset) public {
@@ -222,15 +300,26 @@ contract Supply is VaultManagerTest {
 }
 
 contract Withdraw is VaultManagerTest {
+    function test_RevertIf_AmountZero() public {
+        vm.expectRevert(VaultManager.VaultManager__AmountZero.selector);
+        vm.prank(owner);
+        vault.withdraw(address(usdc), 0);
+    }
+
+    function test_RevertIf_CometNotAllowedOrUnset() public {
+        address otherAsset = makeAddr("OtherAsset");
+        vm.prank(owner);
+        vault.setAllowedAsset(otherAsset, true);
+        vm.expectRevert(VaultManager.VaultManager__CometNotAllowed.selector);
+        vm.prank(owner);
+        vault.withdraw(otherAsset, 1);
+    }
     function test_WithdrawsAssetFromComet() public {
         // ---- Arrange
         uint256 amount = 3e6;
         _fundVault(address(usdc), amount);
         vm.prank(owner);
         vault.supply(address(usdc), amount);
-
-        vm.expectEmit(true, true, true, true);
-        emit VaultManager.CometWithdrawn(address(comet), address(usdc), amount);
 
         // ---- Act
         vm.prank(owner);
@@ -240,16 +329,35 @@ contract Withdraw is VaultManagerTest {
         assertEq(usdc.balanceOf(address(vault)), amount);
         assertEq(comet.balanceOf(address(vault)), 0);
     }
+
+    function test_EmitsCometWithdrawnEvent() public {
+        // ---- Arrange
+        uint256 amount = 4e6;
+        _fundVault(address(usdc), amount);
+        vm.prank(owner);
+        vault.supply(address(usdc), amount);
+
+        vm.expectEmit();
+        emit VaultManager.CometWithdrawn(address(comet), address(usdc), amount);
+
+        // ---- Act (event only)
+        vm.prank(owner);
+        vault.withdraw(address(usdc), amount);
+    }
 }
 
 contract ClaimComp is VaultManagerTest {
+    function test_RevertIf_InvalidToAddress() public {
+        vm.prank(owner);
+        vault.setAllowedComet(address(comet), true);
+        vm.expectRevert(VaultManager.VaultManager__InvalidAddress.selector);
+        vm.prank(owner);
+        vault.claimComp(address(comet), address(0));
+    }
     function test_ClaimsRewards() public {
         // ---- Arrange
         uint256 expected = 42e18;
         cometRewards.setClaimAmount(address(comet), expected);
-
-        vm.expectEmit(true, true, true, true);
-        emit VaultManager.CompClaimed(address(comet), user, expected);
 
         // ---- Act
         vm.prank(owner);
@@ -257,6 +365,19 @@ contract ClaimComp is VaultManagerTest {
 
         // ---- Assert
         assertEq(claimed, expected);
+    }
+
+    function test_EmitsCompClaimedEvent() public {
+        // ---- Arrange
+        uint256 expected = 5e18;
+        cometRewards.setClaimAmount(address(comet), expected);
+
+        vm.expectEmit();
+        emit VaultManager.CompClaimed(address(comet), user, expected);
+
+        // ---- Act (event only)
+        vm.prank(owner);
+        vault.claimComp(address(comet), user);
     }
 
     function testFuzz_RevertIf_CometNotAllowed(address _comet, address _to) public {
@@ -295,6 +416,23 @@ contract GetCurrentPhase is VaultManagerTest {
 }
 
 contract RedeemWETH is VaultManagerTest {
+    function test_RevertIf_AmountZero() public {
+        vm.warp(vault.UNLOCK_TIMESTAMP() + 1);
+        vm.expectRevert(VaultManager.VaultManager__AmountZero.selector);
+        vault.redeemWETH(0, user);
+    }
+
+    function test_RevertIf_InvalidToAddress() public {
+        vm.warp(vault.UNLOCK_TIMESTAMP() + 1);
+        _mintMtTo(user, 1 ether);
+        vm.prank(admin);
+        mtToken.grantRole(BURNER_ROLE, address(vault));
+        vm.prank(user);
+        mtToken.approve(address(vault), 1 ether);
+        vm.expectRevert(VaultManager.VaultManager__InvalidAddress.selector);
+        vm.prank(user);
+        vault.redeemWETH(1 ether, address(0));
+    }
     function setUp() public override {
         VaultManagerTest.setUp();
         // Grant burner role to the vault for redemption
@@ -318,9 +456,6 @@ contract RedeemWETH is VaultManagerTest {
         uint256 totalSupply = mtToken.totalSupply();
         uint256 expectedWeth = (totalWeth * userMt) / totalSupply;
 
-        vm.expectEmit(true, true, true, true);
-        emit VaultManager.Redeemed(user, user, userMt, expectedWeth);
-
         // ---- Act
         vm.prank(user);
         vault.redeemWETH(userMt, user);
@@ -329,6 +464,27 @@ contract RedeemWETH is VaultManagerTest {
         assertEq(weth.balanceOf(user), expectedWeth);
         assertEq(weth.balanceOf(address(vault)), totalWeth - expectedWeth);
         assertEq(mtToken.balanceOf(user), 0);
+    }
+
+    function test_EmitsRedeemedEvent() public {
+        // ---- Arrange
+        vm.warp(vault.UNLOCK_TIMESTAMP() + 1);
+        uint256 totalWeth = 10 ether;
+        _fundVault(address(weth), totalWeth);
+
+        uint256 userMt = 1 ether;
+        _mintMtTo(user, userMt);
+        vm.prank(user);
+        mtToken.approve(address(vault), userMt);
+
+        uint256 expectedWeth = (totalWeth * userMt) / mtToken.totalSupply();
+
+        vm.expectEmit();
+        emit VaultManager.Redeemed(user, user, userMt, expectedWeth);
+
+        // ---- Act (event only)
+        vm.prank(user);
+        vault.redeemWETH(userMt, user);
     }
 
     function test_RevertIf_NotInRedemptionPhase() public {
@@ -347,12 +503,14 @@ contract RedeemWETH is VaultManagerTest {
 }
 
 contract SetAllowedAsset is VaultManagerTest {
-    function test_SetsAllowedAssetAndEmitsEvent() public {
+    function test_RevertIf_TokenZeroAddress() public {
+        vm.expectRevert(VaultManager.VaultManager__InvalidAddress.selector);
+        vm.prank(owner);
+        vault.setAllowedAsset(address(0), true);
+    }
+    function test_SetsAllowedAsset() public {
         // ---- Arrange
         address token = makeAddr("SomeToken");
-
-        vm.expectEmit(true, true, true, true);
-        emit VaultManager.AllowedAssetSet(token, true);
 
         // ---- Act
         vm.prank(owner);
@@ -361,15 +519,29 @@ contract SetAllowedAsset is VaultManagerTest {
         // ---- Assert
         assertTrue(vault.allowedAssets(token));
     }
+
+    function test_EmitsAllowedAssetSetEvent() public {
+        // ---- Arrange
+        address token = makeAddr("SomeToken");
+
+        vm.expectEmit();
+        emit VaultManager.AllowedAssetSet(token, true);
+
+        // ---- Act (event only)
+        vm.prank(owner);
+        vault.setAllowedAsset(token, true);
+    }
 }
 
 contract SetAllowedComet is VaultManagerTest {
-    function test_SetsAllowedCometAndEmitsEvent() public {
+    function test_RevertIf_CometZeroAddress() public {
+        vm.expectRevert(VaultManager.VaultManager__InvalidAddress.selector);
+        vm.prank(owner);
+        vault.setAllowedComet(address(0), true);
+    }
+    function test_SetsAllowedComet() public {
         // ---- Arrange
         address c = makeAddr("SomeComet");
-
-        vm.expectEmit(true, true, true, true);
-        emit VaultManager.AllowedCometSet(c, true);
 
         // ---- Act
         vm.prank(owner);
@@ -378,14 +550,41 @@ contract SetAllowedComet is VaultManagerTest {
         // ---- Assert
         assertTrue(vault.allowedComets(c));
     }
+
+    function test_EmitsAllowedCometSetEvent() public {
+        // ---- Arrange
+        address c = makeAddr("SomeComet");
+
+        vm.expectEmit();
+        emit VaultManager.AllowedCometSet(c, true);
+
+        // ---- Act (event only)
+        vm.prank(owner);
+        vault.setAllowedComet(c, true);
+    }
 }
 
 contract SetAssetComet is VaultManagerTest {
-    function test_SetsAssetCometAndEmitsEvent() public {
+    function test_RevertIf_AssetNotAllowListed() public {
+        address c = address(comet);
+        address newAsset = makeAddr("NewAsset");
+        // asset not allowlisted
+        vm.expectRevert(VaultManager.VaultManager__AssetNotAllowed.selector);
+        vm.prank(owner);
+        vault.setAssetComet(newAsset, c);
+    }
+
+    function test_RevertIf_CometNotAllowListed() public {
+        address notAllowedComet = makeAddr("NotAllowedComet");
+        vm.prank(owner);
+        vault.setAllowedAsset(address(usdc), true);
+        vm.expectRevert(VaultManager.VaultManager__CometNotAllowed.selector);
+        vm.prank(owner);
+        vault.setAssetComet(address(usdc), notAllowedComet);
+    }
+    function test_SetsAssetComet() public {
         // ---- Arrange
         address c = address(comet);
-        vm.expectEmit(true, true, true, true);
-        emit VaultManager.AssetCometSet(address(usdc), c);
 
         // ---- Act
         vm.prank(owner);
@@ -401,15 +600,29 @@ contract SetAssetComet is VaultManagerTest {
         vm.prank(owner);
         vault.setAssetComet(_asset, _comet);
     }
+
+    function test_EmitsAssetCometSetEvent() public {
+        // ---- Arrange
+        address c = address(comet);
+
+        vm.expectEmit();
+        emit VaultManager.AssetCometSet(address(usdc), c);
+
+        // ---- Act (event only)
+        vm.prank(owner);
+        vault.setAssetComet(address(usdc), c);
+    }
 }
 
 contract SetAgent is VaultManagerTest {
-    function test_UpdatesAgentRoleAndEmitsEvent() public {
+    function test_RevertIf_NewAgentZero() public {
+        vm.expectRevert(VaultManager.VaultManager__InvalidAddress.selector);
+        vm.prank(owner);
+        vault.setAgent(address(0));
+    }
+    function test_UpdatesAgentRole() public {
         // ---- Arrange
         address newAgent = makeAddr("NewAgent");
-
-        vm.expectEmit(true, true, true, true);
-        emit VaultManager.AgentSet(newAgent);
 
         // ---- Act
         vm.prank(owner);
@@ -417,6 +630,18 @@ contract SetAgent is VaultManagerTest {
 
         // ---- Assert
         assertTrue(vault.hasRole(AGENT_ROLE, newAgent));
+    }
+
+    function test_EmitsAgentSetEvent() public {
+        // ---- Arrange
+        address newAgent = makeAddr("NewAgent");
+
+        vm.expectEmit();
+        emit VaultManager.AgentSet(newAgent);
+
+        // ---- Act (event only)
+        vm.prank(owner);
+        vault.setAgent(newAgent);
     }
 }
 
