@@ -129,6 +129,7 @@ contract SwapExactInputV3 is VaultManagerTest {
             })
         );
     }
+
     function test_SwapsInLockedPhase() public {
         // ---- Arrange
         uint256 amountIn = 1_000_000; // 1 USDC
@@ -263,6 +264,7 @@ contract Supply is VaultManagerTest {
         vm.prank(owner);
         vault.supply(otherAsset, 1);
     }
+
     function test_DepositsAssetToComet() public {
         // ---- Arrange
         uint256 amount = 5e6;
@@ -314,6 +316,7 @@ contract Withdraw is VaultManagerTest {
         vm.prank(owner);
         vault.withdraw(otherAsset, 1);
     }
+
     function test_WithdrawsAssetFromComet() public {
         // ---- Arrange
         uint256 amount = 3e6;
@@ -354,6 +357,7 @@ contract ClaimComp is VaultManagerTest {
         vm.prank(owner);
         vault.claimComp(address(comet), address(0));
     }
+
     function test_ClaimsRewards() public {
         // ---- Arrange
         uint256 expected = 42e18;
@@ -433,6 +437,7 @@ contract RedeemWETH is VaultManagerTest {
         vm.prank(user);
         vault.redeemWETH(1 ether, address(0));
     }
+
     function setUp() public override {
         VaultManagerTest.setUp();
         // Grant burner role to the vault for redemption
@@ -508,6 +513,7 @@ contract SetAllowedAsset is VaultManagerTest {
         vm.prank(owner);
         vault.setAllowedAsset(address(0), true);
     }
+
     function test_SetsAllowedAsset() public {
         // ---- Arrange
         address token = makeAddr("SomeToken");
@@ -539,6 +545,7 @@ contract SetAllowedComet is VaultManagerTest {
         vm.prank(owner);
         vault.setAllowedComet(address(0), true);
     }
+
     function test_SetsAllowedComet() public {
         // ---- Arrange
         address c = makeAddr("SomeComet");
@@ -582,6 +589,7 @@ contract SetAssetComet is VaultManagerTest {
         vm.prank(owner);
         vault.setAssetComet(address(usdc), notAllowedComet);
     }
+
     function test_SetsAssetComet() public {
         // ---- Arrange
         address c = address(comet);
@@ -620,6 +628,7 @@ contract SetAgent is VaultManagerTest {
         vm.prank(owner);
         vault.setAgent(address(0));
     }
+
     function test_UpdatesAgentRole() public {
         // ---- Arrange
         address newAgent = makeAddr("NewAgent");
