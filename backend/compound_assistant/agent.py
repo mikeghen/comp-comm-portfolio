@@ -28,7 +28,7 @@ def load_system_prompt():
         "You have expert level skills writing Python code specifically for data analysis. "
         "You will be provided with a information below that outlines the user's financial goals and objectives. "
         "You will be assigned a role to play as the agent making sure the user's financial plan is followed. "
-        "Show transaction links using https://sepolia.basescan.org/. "
+        "Show transaction links using https://basescan.org/. "
         "Show all math as codeblocks of python psuedo code. "
         "\n"    
         f"Your Role: {agent.get('role', '')}\n"
