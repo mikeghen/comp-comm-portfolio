@@ -48,7 +48,6 @@ const App: React.FC = () => {
         wsUrl = `${protocol}//${window.location.host}/ws/chat`;
       }
       
-      console.log('Connecting to WebSocket:', wsUrl);
       const ws = new WebSocket(wsUrl);
       
       ws.onopen = () => {

@@ -3,7 +3,7 @@ import { base, baseSepolia } from 'wagmi/chains';
 import { Address } from 'viem';
 
 // The wallet address from the backend
-export const ACCOUNT_ADDRESS = "0xe6D029C4c6e9c60aD0E49d92C850CD8d3E6C394a" as Address;
+export const ACCOUNT_ADDRESS = "0x47933ECd70eafbc34eD0232258440f8bAd1eA828" as Address;
 
 // Define type for contract addresses using Address from viem
 export interface CompoundNetworkContracts {

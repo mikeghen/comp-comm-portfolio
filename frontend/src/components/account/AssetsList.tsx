@@ -61,7 +61,6 @@ const AssetsList: React.FC = () => {
   // Refetch data when block number changes
   useEffect(() => {
     if (blockNumber && blockNumber !== prevBlockNumberRef.current) {
-      console.log(`Block number changed to ${blockNumber}, refetching collateral assets`);
       refetchNumAssets();
       prevBlockNumberRef.current = blockNumber;
     }
@@ -128,9 +127,7 @@ const AssetsList: React.FC = () => {
   
   // Refetch all asset data when block number changes
   useEffect(() => {
-    if (blockNumber && blockNumber !== prevBlockNumberRef.current && assetIndices.length > 0) {
-      console.log(`Block number changed to ${blockNumber}, refetching all asset data`);
-      
+    if (blockNumber && blockNumber !== prevBlockNumberRef.current && assetIndices.length > 0) {      
       // Refetch all asset data
       assetIndices.forEach(i => {
         if (i < assetInfoResults.length) {
@@ -144,18 +141,7 @@ const AssetsList: React.FC = () => {
       prevBlockNumberRef.current = blockNumber;
     }
   }, [blockNumber, assetIndices, assetInfoResults, assetBalanceResults, assetSymbolResults, cometPriceResults]);
-  
-  // Log when asset data changes
-  useEffect(() => {
-    if (assetBalanceResults.some(result => result.data)) {
-      console.log('Asset balances updated on block', blockNumber);
-      assetBalanceResults.forEach((result, i) => {
-        if (result.data) {
-          console.log(`Asset ${i} balance:`, result.data);
-        }
-      });
-    }
-  }, [assetBalanceResults, blockNumber]);
+
   
   // Process all the data into a usable format
   const [stableCollateralAssets, setStableCollateralAssets] = useState<any[]>([]);
@@ -239,10 +225,7 @@ const AssetsList: React.FC = () => {
 
   // Add a specific effect just for balance updates
   useEffect(() => {
-    if (blockNumber && prevBlockNumberRef.current !== blockNumber && assetIndices.length > 0) {
-      // Specifically focus on refetching balances on every block, as they're most likely to change
-      console.log(`Block number changed to ${blockNumber}, refreshing all asset balances`);
-      
+    if (blockNumber && prevBlockNumberRef.current !== blockNumber && assetIndices.length > 0) {      
       assetIndices.forEach(i => {
         if (i < assetBalanceResults.length) {
           assetBalanceResults[i].refetch();
@@ -269,13 +252,6 @@ const AssetsList: React.FC = () => {
 
   // Provide collateral assets
   const collateralAssets = hasCollateralLoaded ? stableCollateralAssets : [];
-
-  // Log assets information for debugging
-  useEffect(() => {
-    if (collateralAssets.length > 0) {
-      console.log('Current collateral assets:', collateralAssets);
-    }
-  }, [collateralAssets]);
 
   return (
     <Card className="mb-4">

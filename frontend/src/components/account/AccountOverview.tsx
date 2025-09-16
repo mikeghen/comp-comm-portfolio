@@ -188,7 +188,6 @@ function AccountOverview() {
   // Refetch data when block number changes
   useEffect(() => {
     if (blockNumber && blockNumber !== prevBlockNumberRef.current) {
-      console.log(`Block number changed to ${blockNumber}, refetching data`);
       refetchBorrowBalance();
       refetchNumAssets();
       
