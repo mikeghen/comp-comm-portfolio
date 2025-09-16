@@ -1,6 +1,6 @@
 import React from 'react';
 import AccountOverview from './AccountOverview';
-import BorrowList from './BorrowList';
+import WalletAssetsList from './WalletAssetsList';
 import AssetsList from './AssetsList';
 
 const AccountDashboard: React.FC = () => {
@@ -23,7 +23,7 @@ const AccountDashboard: React.FC = () => {
       
       <div className="row mt-4">
         <div className="col-md-6 mb-4 mb-md-0">
-          <BorrowList />
+          <WalletAssetsList />
         </div>
         <div className="col-md-6">
           <AssetsList />

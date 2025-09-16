@@ -3,8 +3,10 @@ import { useReadContract, useBlockNumber, useAccount } from 'wagmi';
 import { formatUnits } from 'viem';
 import { 
   ACCOUNT_ADDRESS,
-  COMET_ABI, 
-  getContractAddress, 
+  COMET_ABI,
+  ERC20_ABI, 
+  getContractAddress,
+  getContractsByChainId, 
   getNetworkName, 
   isSupportedChain 
 } from '../../config/contracts';
@@ -23,6 +25,15 @@ type AssetInfo = {
 // Define a type for userCollateral return value
 type UserCollateral = [bigint, bigint]; // [balance, lastUpdatedTimestamp]
 
+// Define the wallet assets based on the allow list from the issue
+const WALLET_ASSETS = [
+  { symbol: 'USDC', contractKey: 'USDC' as const, decimals: 6 },
+  { symbol: 'WETH', contractKey: 'WETH' as const, decimals: 18 },
+  { symbol: 'cbETH', contractKey: 'cbETH' as const, decimals: 18 },
+  { symbol: 'cbBTC', contractKey: 'cbBTC' as const, decimals: 8 },
+  { symbol: 'WSTETH', contractKey: 'WSTETH' as const, decimals: 18 },
+];
+
 function AccountOverview() {
   const { chainId } = useAccount();
   const { data: blockNumber } = useBlockNumber({ watch: true });
@@ -33,6 +44,50 @@ function AccountOverview() {
 
   // Get Comet contract address
   const cometAddress = getContractAddress(chainId, 'Comet');
+  
+  // Get contract addresses for wallet assets
+  const contracts = getContractsByChainId(chainId);
+  
+  // ------------------------------
+  // Wallet Assets Section
+  // ------------------------------
+  
+  // Create hooks for wallet asset balances
+  const walletAssetHooks = WALLET_ASSETS.map(asset => {
+    const contractAddress = contracts?.[asset.contractKey];
+    
+    return useReadContract({
+      address: contractAddress,
+      abi: ERC20_ABI,
+      functionName: 'balanceOf',
+      args: [ACCOUNT_ADDRESS],
+    });
+  });
+  
+  // Calculate total wallet value
+  const totalWalletValue = useMemo(() => {
+    if (!contracts) return 0;
+    
+    // Mock prices for wallet assets - in production, fetch from price oracle
+    const mockPrices: Record<string, number> = {
+      'USDC': 1.00,
+      'WETH': 3500.00,
+      'cbETH': 3450.00,
+      'cbBTC': 95000.00,
+      'WSTETH': 4100.00,
+    };
+    
+    return WALLET_ASSETS.reduce((total, asset, index) => {
+      const balanceResult = walletAssetHooks[index];
+      if (balanceResult.data === undefined || balanceResult.isError) return total;
+      
+      const balance = formatUnits(balanceResult.data as bigint, asset.decimals);
+      const price = mockPrices[asset.symbol] || 0;
+      const value = parseFloat(balance) * price;
+      
+      return total + (isNaN(value) ? 0 : value);
+    }, 0);
+  }, [contracts, walletAssetHooks, blockNumber]);
 
   // ------------------------------
   // Borrow Balance Section
@@ -133,7 +188,6 @@ function AccountOverview() {
   // Refetch data when block number changes
   useEffect(() => {
     if (blockNumber && blockNumber !== prevBlockNumberRef.current) {
-      console.log(`Block number changed to ${blockNumber}, refetching data`);
       refetchBorrowBalance();
       refetchNumAssets();
       
@@ -146,9 +200,14 @@ function AccountOverview() {
         }
       });
       
+      // Refetch wallet asset balances
+      walletAssetHooks.forEach(hook => {
+        hook.refetch();
+      });
+      
       prevBlockNumberRef.current = blockNumber;
     }
-  }, [blockNumber, refetchBorrowBalance, refetchNumAssets, assetIndices, assetInfoResults, assetBalanceResults, cometPriceResults]);
+  }, [blockNumber, refetchBorrowBalance, refetchNumAssets, assetIndices, assetInfoResults, assetBalanceResults, cometPriceResults, walletAssetHooks]);
 
   // Process collateral assets data
   const collateralAssets = useMemo(() => {
@@ -193,33 +252,33 @@ function AccountOverview() {
   
   // Calculate total values
   const {
-    totalCollateralValue,
-    totalBorrowedValue,
+    totalCompoundValue,
+    totalWalletValueFormatted,
     netWorth,
     percentChange
   } = useMemo(() => {
-    // Convert string collateral values to numbers and sum them up
-    const totalCollateral = collateralAssets?.reduce((sum, asset) => {
+    // Convert string collateral values to numbers and sum them up (now "Compound" assets)
+    const totalCompound = collateralAssets?.reduce((sum, asset) => {
       const assetValue = parseFloat(asset?.balanceUSD || '0');
       return sum + (isNaN(assetValue) ? 0 : assetValue);
     }, 0) || 0;
     
-    // Convert string borrow value to number
-    const totalBorrowed = parseFloat(borrowBalance || '0');
+    // Total wallet value (calculated above)
+    const totalWallet = totalWalletValue;
     
-    // Calculate net worth (collateral - borrowed)
-    const net = totalCollateral - totalBorrowed;
+    // Calculate net worth (wallet + compound assets)
+    const net = totalWallet + totalCompound;
     
     // Mock percentage change for now (could be calculated from historical data)
     const percentChangeValue = 3.2;
     
     return {
-      totalCollateralValue: totalCollateral,
-      totalBorrowedValue: totalBorrowed,
+      totalCompoundValue: totalCompound,
+      totalWalletValueFormatted: totalWallet,
       netWorth: net,
       percentChange: percentChangeValue
     };
-  }, [collateralAssets, borrowBalance]);
+  }, [collateralAssets, totalWalletValue]);
 
   // Format values for display
   const formattedNetWorth = netWorth.toLocaleString('en-US', {
@@ -227,21 +286,23 @@ function AccountOverview() {
     currency: 'USD'
   });
   
-  const formattedCollateral = totalCollateralValue.toLocaleString('en-US', {
+  const formattedWallet = totalWalletValueFormatted.toLocaleString('en-US', {
     style: 'currency',
     currency: 'USD'
   });
   
-  const formattedBorrowed = totalBorrowedValue.toLocaleString('en-US', {
+  const formattedCompound = totalCompoundValue.toLocaleString('en-US', {
     style: 'currency',
     currency: 'USD'
   });
 
   // Determine final loading and error states
+  const isWalletLoading = walletAssetHooks.some(hook => hook.isLoading);
+  const isWalletError = walletAssetHooks.some(hook => hook.isError);
   const isCollateralLoading = !hasCollateralLoaded;
   const isCollateralError = numAssetsError || assetIndices.some(i => assetInfoResults[i]?.isError);
-  const isLoading = (!hasBorrowLoaded && isBorrowLoading) || isCollateralLoading;
-  const isError = isBorrowError || isCollateralError;
+  const isLoading = (!hasBorrowLoaded && isBorrowLoading) || isCollateralLoading || isWalletLoading;
+  const isError = isBorrowError || isCollateralError || isWalletError;
 
   return (
     <div className="card mb-4">
@@ -278,15 +339,15 @@ function AccountOverview() {
             </div>
             <div className="row">
               <div className="col-6 col-md-6">
-                <div className="text-muted small">Total Collateral</div>
-                <div className="h5 text-success">
-                  {formattedCollateral}
+                <div className="text-muted small">Total Wallet</div>
+                <div className="h5 text-primary">
+                  {formattedWallet}
                 </div>
               </div>
               <div className="col-6 col-md-6">
-                <div className="text-muted small">Total Borrowed</div>
-                <div className="h5 text-danger">
-                  {formattedBorrowed}
+                <div className="text-muted small">Total Compound</div>
+                <div className="h5 text-success">
+                  {formattedCompound}
                 </div>
               </div>
             </div>

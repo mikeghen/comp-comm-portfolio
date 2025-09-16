@@ -6,21 +6,20 @@ import {
   getDefaultConfig
 } from '@rainbow-me/rainbowkit';
 import { WagmiConfig } from 'wagmi';
-import { base, baseSepolia } from 'wagmi/chains';
+import { base } from 'wagmi/chains';
 import { http } from 'viem';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Create a client for React Query
 const queryClient = new QueryClient();
 
-// Configure RainbowKit + Wagmi with only Base and Base Sepolia
+// Configure RainbowKit + Wagmi with only Base Mainnet
 const config = getDefaultConfig({
   appName: 'Compound Assistant',
   projectId: 'YOUR_PROJECT_ID', // Get this from https://cloud.walletconnect.com
-  chains: [base, baseSepolia],
+  chains: [base],
   transports: {
     [base.id]: http(),
-    [baseSepolia.id]: http(),
   },
   ssr: false, // Disable server-side rendering mode
 });
