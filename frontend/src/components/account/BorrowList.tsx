@@ -22,13 +22,6 @@ const BorrowList: React.FC = () => {
   // Get Comet contract address
   const cometAddress = getContractAddress(chainId, 'Comet');
 
-  console.log('Chain detection:', {
-    detectedChainId: chainId,
-    isSupported,
-    networkName,
-    cometAddress
-  });
-
   // Fetch borrow balance
   const { 
     data: borrowBalanceData, 
@@ -127,7 +120,6 @@ const BorrowList: React.FC = () => {
   // ------------------------------
   useEffect(() => {
     if (blockNumber && blockNumber !== prevBlockNumberRef.current) {
-      console.log(`Block number changed to ${blockNumber}, refetching data`);
       refetchBorrowBalance();
       refetchTotalBorrow();
       refetchTotalSupply();
@@ -140,13 +132,6 @@ const BorrowList: React.FC = () => {
   useEffect(() => {
     refetchBorrowRate();
   }, [utilization, refetchBorrowRate]);
-
-  // Log when borrow balance changes
-  useEffect(() => {
-    if (borrowBalanceData) {
-      console.log(`Borrow balance updated on block ${blockNumber}:`, borrowBalanceData);
-    }
-  }, [borrowBalanceData, blockNumber]);
 
   // Format the borrow balance
   const borrowBalance = borrowBalanceData !== undefined ? formatUnits(borrowBalanceData as bigint, 6) : '0';
@@ -167,20 +152,6 @@ const BorrowList: React.FC = () => {
     style: 'currency',
     currency: 'USD'
   });
-
-  // Add a useEffect for tracking component state changes
-  useEffect(() => {
-    console.log('BorrowList component state:', {
-      borrowBalance,
-      formattedBorrowAPR,
-      weeklyInterest,
-      isLoading,
-      isError,
-      errorDetails: borrowError,
-      isSupported,
-      networkName
-    });
-  }, [borrowBalance, formattedBorrowAPR, weeklyInterest, isLoading, isError, borrowError, isSupported, networkName]);
 
   return (
     <Card className="mb-4">

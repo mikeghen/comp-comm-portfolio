@@ -3,7 +3,7 @@ import { base, baseSepolia } from 'wagmi/chains';
 import { Address } from 'viem';
 
 // The wallet address from the backend
-export const ACCOUNT_ADDRESS = "0xe6D029C4c6e9c60aD0E49d92C850CD8d3E6C394a" as Address;
+export const ACCOUNT_ADDRESS = "0x47933ECd70eafbc34eD0232258440f8bAd1eA828" as Address;
 
 // Define type for contract addresses using Address from viem
 export interface CompoundNetworkContracts {
@@ -13,6 +13,7 @@ export interface CompoundNetworkContracts {
     WETH?: Address;
     cbETH?: Address;
     cbBTC?: Address;
+    WSTETH?: Address;
     Faucet?: Address;
 }
 
@@ -30,6 +31,7 @@ export const CompoundContracts: Record<number, CompoundNetworkContracts> = {
         WETH: "0x4200000000000000000000000000000000000006",    
         cbETH: "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22",   
         cbBTC: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+        WSTETH: "0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452",
     },
     // Base Sepolia Testnet
     [BASE_SEPOLIA_CHAIN_ID]: {
