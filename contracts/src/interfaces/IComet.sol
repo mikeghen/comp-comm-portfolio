@@ -6,5 +6,3 @@ interface IComet {
     function withdraw(address asset, uint256 amount) external;
     function balanceOf(address account) external view returns (uint256);
 }
-
-

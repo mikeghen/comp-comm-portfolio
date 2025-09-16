@@ -126,7 +126,6 @@ contract SwapExactInputV3 is VaultManagerTest {
     function testFuzz_RevertIf_TokenNotAllowed(address _token) public {
         vm.assume(_token != address(usdc) && _token != address(weth) && _token != address(0));
         // ---- Arrange
-        MockERC20(_token); // just to avoid unused warnings if different
         _fundVault(address(usdc), 1e6);
 
         // ---- Assert

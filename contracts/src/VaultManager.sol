@@ -22,6 +22,7 @@ contract VaultManager is Ownable2Step, AccessControl, ReentrancyGuard, Pausable 
     // --------------------
     // Errors
     // --------------------
+
     error VaultManager__InvalidAddress();
     error VaultManager__AssetNotAllowed();
     error VaultManager__CometNotAllowed();
