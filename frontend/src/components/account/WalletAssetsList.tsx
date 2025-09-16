@@ -9,14 +9,19 @@ import {
   getContractsByChainId,
   isSupportedChain 
 } from '../../config/contracts';
+import { getTokenPricesWithFallback } from '../../utils/priceService';
 
-// Define the wallet assets based on the allow list from the issue
+// Define the wallet assets including the new compound tokens
 const WALLET_ASSETS = [
   { symbol: 'USDC', contractKey: 'USDC' as const, decimals: 6 },
   { symbol: 'WETH', contractKey: 'WETH' as const, decimals: 18 },
   { symbol: 'cbETH', contractKey: 'cbETH' as const, decimals: 18 },
   { symbol: 'cbBTC', contractKey: 'cbBTC' as const, decimals: 8 },
   { symbol: 'WSTETH', contractKey: 'WSTETH' as const, decimals: 18 },
+  { symbol: 'AERO', contractKey: 'AERO' as const, decimals: 18 },
+  { symbol: 'cUSDCv3', contractKey: 'cUSDCv3' as const, decimals: 6 },
+  { symbol: 'cWETHv3', contractKey: 'cWETHv3' as const, decimals: 18 },
+  { symbol: 'cAEROv3', contractKey: 'cAEROv3' as const, decimals: 18 },
 ];
 
 const WalletAssetsList: React.FC = () => {
@@ -29,9 +34,36 @@ const WalletAssetsList: React.FC = () => {
   // Get contract addresses for the current chain
   const contracts = getContractsByChainId(chainId);
   
-  // State to track loading
-  const [hasLoaded, setHasLoaded] = useState(false);
-  const [walletAssets, setWalletAssets] = useState<any[]>([]);
+  // State to track initial loading
+  const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
+  
+  // State for token prices
+  const [tokenPrices, setTokenPrices] = useState<Record<string, number>>({});
+  const [pricesLoading, setPricesLoading] = useState(true);
+  
+  // Fetch token prices on component mount and periodically
+  useEffect(() => {
+    const fetchPrices = async () => {
+      try {
+        setPricesLoading(true);
+        const symbols = WALLET_ASSETS.map(asset => asset.symbol);
+        const prices = await getTokenPricesWithFallback(symbols);
+        setTokenPrices(prices);
+      } catch (error) {
+        console.error('Error fetching token prices:', error);
+      } finally {
+        setPricesLoading(false);
+      }
+    };
+
+    // Fetch prices immediately
+    fetchPrices();
+
+    // Set up interval to fetch prices every 2 minutes
+    const priceInterval = setInterval(fetchPrices, 2 * 60 * 1000);
+
+    return () => clearInterval(priceInterval);
+  }, []);
   
   // Create contract read hooks for each wallet asset
   const assetBalanceHooks = WALLET_ASSETS.map(asset => {
@@ -60,17 +92,8 @@ const WalletAssetsList: React.FC = () => {
       // Format the balance
       const balance = formatUnits(balanceResult.data as bigint, asset.decimals);
       
-      // For wallet assets, we'll use a mock price of $1 for USDC and market prices for others
-      // In a real implementation, you'd fetch these from a price oracle
-      const mockPrices: Record<string, number> = {
-        'USDC': 1.00,
-        'WETH': 3500.00,
-        'cbETH': 3450.00,
-        'cbBTC': 95000.00,
-        'WSTETH': 4100.00,
-      };
-      
-      const price = mockPrices[asset.symbol] || 0;
+      // Get real-time price from CoinGecko (with fallback)
+      const price = tokenPrices[asset.symbol] || 0;
       const balanceUSD = (parseFloat(balance) * price).toFixed(2);
       
       return {
@@ -81,27 +104,33 @@ const WalletAssetsList: React.FC = () => {
         contractAddress,
       };
     }).filter(asset => asset && parseFloat(asset.balance) > 0);
-  }, [contracts, assetBalanceHooks, blockNumber]);
+  }, [contracts, assetBalanceHooks, tokenPrices]);
   
-  // Update wallet assets when processed assets change
+  // Track when initial loading is complete
   useEffect(() => {
-    if (processedAssets.length > 0) {
-      setWalletAssets(processedAssets);
-      setHasLoaded(true);
-    } else if (contracts && assetBalanceHooks.every(hook => hook.data !== undefined || hook.isError)) {
-      // All hooks have completed (either with data or error), and we have no valid assets
-      setHasLoaded(true);
+    if (!hasInitiallyLoaded) {
+      // Check if all hooks have completed (either with data or error)
+      const allCompleted = assetBalanceHooks.every(hook => 
+        hook.data !== undefined || hook.isError
+      );
+      
+      if (allCompleted && contracts && !pricesLoading) {
+        setHasInitiallyLoaded(true);
+      }
     }
-  }, [processedAssets, contracts, assetBalanceHooks]);
+  }, [hasInitiallyLoaded, contracts, pricesLoading]); // Removed assetBalanceHooks from dependencies
   
-  // Determine loading and error states
-  const isLoading = !hasLoaded && assetBalanceHooks.some(hook => hook.isLoading);
+  // Create a stable reference for loading check
+  const isAnyLoading = assetBalanceHooks.some(hook => hook.isLoading);
   const hasErrors = assetBalanceHooks.some(hook => hook.isError);
+  
+  // Determine loading state
+  const isLoading = !hasInitiallyLoaded && (isAnyLoading || pricesLoading);
   
   return (
     <Card className="mb-4">
       <Card.Header className="bg-white border-bottom">
-        <h5 className="mb-0">Wallet</h5>
+        <h5 className="mb-0">Holdings</h5>
       </Card.Header>
       <ListGroup variant="flush">
         {!isSupported ? (
@@ -119,17 +148,17 @@ const WalletAssetsList: React.FC = () => {
               Check console for detailed error information
             </div>
           </ListGroup.Item>
-        ) : walletAssets.length === 0 ? (
+        ) : processedAssets.length === 0 ? (
           <ListGroup.Item className="text-center py-3 text-muted">
             No wallet assets found
           </ListGroup.Item>
         ) : (
-          walletAssets.map((asset, index) => {
+          processedAssets.map((asset, index) => {
             if (!asset) return null;
             
             return (
               <AssetRow 
-                key={`${asset.symbol}-${index}`}
+                key={`${asset.symbol}-${asset.contractAddress}`}
                 symbol={asset.symbol}
                 amount={asset.balance}
                 value={asset.balanceUSD}

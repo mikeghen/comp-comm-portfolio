@@ -1,6 +1,6 @@
-# Compound Assistant Frontend
+# Compound Community Portfolio Frontend
 
-This is the frontend for the Compound Assistant. It is built with React and uses the Wagmi library to connect to the Ethereum blockchain.
+This is the frontend for the Compound Community Portfolio. It is built with React and uses the Wagmi library to connect to the Ethereum blockchain.
 
 ## Demonstrates
 - **Compound Protocol Integration** using Coinbase Agentkit and LangGraph.
