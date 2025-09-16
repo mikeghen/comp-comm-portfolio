@@ -14,6 +14,10 @@ export interface CompoundNetworkContracts {
     cbETH?: Address;
     cbBTC?: Address;
     WSTETH?: Address;
+    AERO?: Address;
+    cUSDCv3?: Address;
+    cWETHv3?: Address;
+    cAEROv3?: Address;
     Faucet?: Address;
 }
 
@@ -32,6 +36,10 @@ export const CompoundContracts: Record<number, CompoundNetworkContracts> = {
         cbETH: "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22",   
         cbBTC: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
         WSTETH: "0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452",
+        AERO: "0x940181a94A35A4569E4529A3CDfB74e38FD98631",
+        cUSDCv3: "0xb125E6687d4313864e53df431d5425969c15Eb2F",
+        cWETHv3: "0x46e6b214b524310239732D51387075E0e70970bf",
+        cAEROv3: "0x784efeB622244d2348d4F2522f8860B96fbEcE89",
     },
     // Base Sepolia Testnet
     [BASE_SEPOLIA_CHAIN_ID]: {

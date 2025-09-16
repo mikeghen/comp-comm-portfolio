@@ -1,7 +1,6 @@
 import React from 'react';
 import { Card } from 'react-bootstrap';
 import AccountOverview from './AccountOverview';
-import AssetsList from './AssetsList';
 import WalletAssetsList from './WalletAssetsList';
 
 function AccountContainer() {
@@ -10,7 +9,6 @@ function AccountContainer() {
       <Card.Body className="overflow-auto">
         <AccountOverview />
         <WalletAssetsList />
-        <AssetsList />
       </Card.Body>
     </Card>
   );

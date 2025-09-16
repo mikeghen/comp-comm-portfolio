@@ -19,7 +19,7 @@ const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       type: 'agent',
-      content: `Welcome to the Compound Assistant! I can help you interact with the Compound Protocol on the blockchain.`
+      content: `Welcome to the Compound Community Portfolio! Send a message to make an adjustment to the portfolio.`
     }
   ]);
   const [input, setInput] = useState<string>('');

@@ -6,7 +6,7 @@ function Header() {
   return (
     <Navbar bg="success" variant="dark" expand="lg" sticky="top">
       <Container>
-        <Navbar.Brand href="#home">Compound Assistant</Navbar.Brand>
+        <Navbar.Brand href="#home">Compound Community Portfolio</Navbar.Brand>
         <Navbar.Toggle aria-controls="basic-navbar-nav" />
         <Navbar.Collapse id="basic-navbar-nav" className="justify-content-between">
           <Nav className="me-auto">

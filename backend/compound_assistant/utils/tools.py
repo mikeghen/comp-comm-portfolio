@@ -11,10 +11,20 @@ from coinbase_agentkit import (
     EthAccountWalletProvider,
     EthAccountWalletProviderConfig,
     compound_action_provider,
+    erc20_action_provider,
     uniswap_v3_action_provider,
+    wallet_action_provider,
     weth_action_provider,
 )
 from coinbase_agentkit_langchain import get_langchain_tools
+
+ALLOWED_TOOLS = [
+    "compound_deposit", 
+    "compound_redeem", 
+    "uniswap_v3_swap", 
+    "weth_wrap", 
+    "get_balance" # erc20_action_provider and wallet_action_provider
+]
 
 def initialize_agentkit():
     """
@@ -40,7 +50,9 @@ def initialize_agentkit():
         wallet_provider=wallet_provider,
         action_providers=[
             compound_action_provider(), # Only supports supplying and withdrawing from allowed assets from Compound v3
+            erc20_action_provider(), # Only supports transferring ERC20 tokens
             uniswap_v3_action_provider(), # Only supports swapping between allowed assets
+            wallet_action_provider(), # Only supports transferring ETH
             weth_action_provider(), # Only supports wrapping ETH to WETH
         ]
     ))
@@ -56,7 +68,7 @@ def get_tools():
     all_tools = get_langchain_tools(agentkit)
 
     # Filter out tools that are not supported by the agent
-    tools = [tool for tool in all_tools if tool.name not in ["compound_supply", "compound_withdraw", "uniswap_v3_swap", "weth_wrap"]]
+    tools = [tool for tool in all_tools if tool.name not in ALLOWED_TOOLS]
 
     try:
         # If available, use LangChain's built-in Python interpreter tool.

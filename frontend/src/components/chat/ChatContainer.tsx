@@ -31,7 +31,7 @@ function ChatContainer({
       ) : (
         <Card.Body className="d-flex flex-column align-items-center justify-content-center text-center p-5">
           <h2>Connect your wallet to start chatting</h2>
-          <p className="text-muted">The Compound Assistant requires a connected wallet to interact with the Compound Protocol.</p>
+          <p className="text-muted">The Compound Community Portfolio requires a connected wallet to interact with the Compound Protocol.</p>
         </Card.Body>
       )}
     </Card>

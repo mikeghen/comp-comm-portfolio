@@ -15,7 +15,7 @@ const queryClient = new QueryClient();
 
 // Configure RainbowKit + Wagmi with only Base Mainnet
 const config = getDefaultConfig({
-  appName: 'Compound Assistant',
+  appName: 'Compound Community Portfolio',
   projectId: 'YOUR_PROJECT_ID', // Get this from https://cloud.walletconnect.com
   chains: [base],
   transports: {
