@@ -280,7 +280,7 @@ const AssetsList: React.FC = () => {
   return (
     <Card className="mb-4">
       <Card.Header className="bg-white border-bottom">
-        <h5 className="mb-0">Collateral</h5>
+        <h5 className="mb-0">Compound Assets</h5>
       </Card.Header>
       <ListGroup variant="flush">
         {!isSupported ? (
@@ -300,7 +300,7 @@ const AssetsList: React.FC = () => {
           </ListGroup.Item>
         ) : collateralAssets.length === 0 ? (
           <ListGroup.Item className="text-center py-3 text-muted">
-            No collateral assets supplied
+            No compound assets supplied
           </ListGroup.Item>
         ) : (
           collateralAssets.map((asset) => {

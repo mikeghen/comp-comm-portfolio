@@ -13,6 +13,7 @@ export interface CompoundNetworkContracts {
     WETH?: Address;
     cbETH?: Address;
     cbBTC?: Address;
+    WSTETH?: Address;
     Faucet?: Address;
 }
 
@@ -30,6 +31,7 @@ export const CompoundContracts: Record<number, CompoundNetworkContracts> = {
         WETH: "0x4200000000000000000000000000000000000006",    
         cbETH: "0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22",   
         cbBTC: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+        WSTETH: "0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452",
     },
     // Base Sepolia Testnet
     [BASE_SEPOLIA_CHAIN_ID]: {
