@@ -185,7 +185,7 @@ const AssetsList: React.FC = () => {
         liquidationFactor: formatUnits(info.liquidationFactor || 0n, 18),
         supplyCap: info.supplyCap ? formatUnits(info.supplyCap, decimals) : 'No cap',
       };
-    }).filter(Boolean); // Remove null entries
+    }).filter(asset => asset && parseFloat(asset.balance) > 0); // Remove null entries and zero balances
   }, [assetIndices, assetInfoResults, assetBalanceResults, assetSymbolResults, cometPriceResults, blockNumber]);
 
   // Update stable assets when processed assets change and are valid
