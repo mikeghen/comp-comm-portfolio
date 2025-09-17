@@ -354,15 +354,4 @@ contract VaultManager is Ownable2Step, AccessControl, ReentrancyGuard, Pausable 
   function unpause() external onlyOwner {
     _unpause();
   }
-
-  /// @notice Emergency sweep of tokens with phase restrictions.
-  function sweep(address token, address to) external onlyOwner nonReentrant {
-    if (to == address(0) || token == address(0)) revert VaultManager__InvalidAddress();
-
-    Phase phase = getCurrentPhase();
-    if (phase == Phase.REDEMPTION && token == WETH) revert VaultManager__SweepRestricted();
-
-    uint256 bal = IERC20(token).balanceOf(address(this));
-    IERC20(token).transfer(to, bal);
-  }
 }

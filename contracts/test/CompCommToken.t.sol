@@ -277,6 +277,7 @@ contract BurnFrom is CompCommTokenTest {
 
   function testFuzz_BurnsFromAccountWithApproval(address _account, uint256 _amount) public {
     _assumeSafeAddress(_account);
+    vm.assume(_account != burner);
     _amount = _boundMintAmount(_amount);
 
     // ---- Arrange
@@ -370,6 +371,7 @@ contract BurnFrom is CompCommTokenTest {
     uint256 _approval
   ) public {
     _assumeSafeAddress(_account);
+    vm.assume(_account != burner);
     _amount = _boundMintAmount(_amount);
     _approval = bound(_approval, 0, _amount - 1);
 

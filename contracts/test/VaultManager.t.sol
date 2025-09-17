@@ -73,6 +73,67 @@ contract VaultManagerTest is Test {
     vm.prank(admin);
     mtToken.mint(to, amount);
   }
+
+  // --------------------
+  // Helpers to reduce repetition
+  // --------------------
+  function _warpToPostUnlock() internal {
+    vm.warp(vault.UNLOCK_TIMESTAMP() + 1);
+  }
+
+  function _swapParams(address tokenIn, address tokenOut, uint256 amountIn)
+    internal
+    view
+    returns (ISwapRouter.ExactInputSingleParams memory)
+  {
+    return ISwapRouter.ExactInputSingleParams({
+      tokenIn: tokenIn,
+      tokenOut: tokenOut,
+      fee: 3000,
+      recipient: address(vault),
+      amountIn: amountIn,
+      amountOutMinimum: 0,
+      sqrtPriceLimitX96: 0
+    });
+  }
+
+  function _exactInputSingleAs(address caller, address tokenIn, address tokenOut, uint256 amountIn)
+    internal
+  {
+    vm.prank(caller);
+    vault.exactInputSingle(_swapParams(tokenIn, tokenOut, amountIn));
+  }
+
+  function _supplyAs(address caller, address asset, uint256 amount) internal {
+    vm.prank(caller);
+    vault.supply(asset, amount);
+  }
+
+  function _withdrawAs(address caller, address asset, uint256 amount) internal {
+    vm.prank(caller);
+    vault.withdraw(asset, amount);
+  }
+
+  function _claimCompAs(address caller, address cometAddr, address to) internal returns (uint256) {
+    vm.prank(caller);
+    return vault.claimComp(cometAddr, to);
+  }
+
+  function _grantVaultBurner() internal {
+    vm.prank(admin);
+    mtToken.grantRole(BURNER_ROLE, address(vault));
+  }
+
+  function _mintAndApproveMt(address holder, uint256 amount) internal {
+    _mintMtTo(holder, amount);
+    vm.prank(holder);
+    mtToken.approve(address(vault), amount);
+  }
+
+  function _enterRedemptionWithWETH(uint256 totalWeth) internal {
+    _warpToPostUnlock();
+    _fundVault(address(weth), totalWeth);
+  }
 }
 
 contract Constructor is VaultManagerTest {
@@ -126,36 +187,14 @@ contract Constructor is VaultManagerTest {
 contract SwapExactInputV3 is VaultManagerTest {
   function test_RevertIf_AmountZero() public {
     vm.expectRevert(VaultManager.VaultManager__AmountZero.selector);
-    vm.prank(owner);
-    vault.exactInputSingle(
-      ISwapRouter.ExactInputSingleParams({
-        tokenIn: address(usdc),
-        tokenOut: address(weth),
-        fee: 3000,
-        recipient: address(vault),
-        amountIn: 0,
-        amountOutMinimum: 0,
-        sqrtPriceLimitX96: 0
-      })
-    );
+    _exactInputSingleAs(owner, address(usdc), address(weth), 0);
   }
 
   function test_RevertIf_TokenOutNotWETH_PostUnlock() public {
-    vm.warp(vault.UNLOCK_TIMESTAMP() + 1);
+    _warpToPostUnlock();
     _fundVault(address(usdc), 1e6);
     vm.expectRevert(VaultManager.VaultManager__InvalidPhase.selector);
-    vm.prank(owner);
-    vault.exactInputSingle(
-      ISwapRouter.ExactInputSingleParams({
-        tokenIn: address(usdc),
-        tokenOut: address(usdc),
-        fee: 3000,
-        recipient: address(vault),
-        amountIn: 1,
-        amountOutMinimum: 0,
-        sqrtPriceLimitX96: 0
-      })
-    );
+    _exactInputSingleAs(owner, address(usdc), address(usdc), 1);
   }
 
   function test_SwapsInLockedPhase() public {
@@ -164,18 +203,7 @@ contract SwapExactInputV3 is VaultManagerTest {
     _fundVault(address(usdc), amountIn);
 
     // ---- Act
-    vm.prank(owner);
-    vault.exactInputSingle(
-      ISwapRouter.ExactInputSingleParams({
-        tokenIn: address(usdc),
-        tokenOut: address(weth),
-        fee: 3000,
-        recipient: address(vault),
-        amountIn: amountIn,
-        amountOutMinimum: 0,
-        sqrtPriceLimitX96: 0
-      })
-    );
+    _exactInputSingleAs(owner, address(usdc), address(weth), amountIn);
 
     // ---- Assert
     assertEq(usdc.balanceOf(address(vault)), 0);
@@ -191,18 +219,7 @@ contract SwapExactInputV3 is VaultManagerTest {
     emit VaultManager.SwapExecuted(address(usdc), address(weth), amountIn, amountIn * 2);
 
     // ---- Act (event only)
-    vm.prank(owner);
-    vault.exactInputSingle(
-      ISwapRouter.ExactInputSingleParams({
-        tokenIn: address(usdc),
-        tokenOut: address(weth),
-        fee: 3000,
-        recipient: address(vault),
-        amountIn: amountIn,
-        amountOutMinimum: 0,
-        sqrtPriceLimitX96: 0
-      })
-    );
+    _exactInputSingleAs(owner, address(usdc), address(weth), amountIn);
   }
 
   function testFuzz_RevertIf_TokenNotAllowed(address _token) public {
@@ -214,73 +231,55 @@ contract SwapExactInputV3 is VaultManagerTest {
     vm.expectRevert(VaultManager.VaultManager__AssetNotAllowed.selector);
 
     // ---- Act
-    vm.prank(owner);
-    vault.exactInputSingle(
-      ISwapRouter.ExactInputSingleParams({
-        tokenIn: _token,
-        tokenOut: address(weth),
-        fee: 3000,
-        recipient: address(vault),
-        amountIn: 1e6,
-        amountOutMinimum: 0,
-        sqrtPriceLimitX96: 0
-      })
-    );
+    _exactInputSingleAs(owner, _token, address(weth), 1e6);
   }
 
   function test_RevertIf_PostUnlock_SwapNotToWETH() public {
     // ---- Arrange
-    vm.warp(vault.UNLOCK_TIMESTAMP() + 1);
+    _warpToPostUnlock();
     _fundVault(address(usdc), 1e6);
 
     // ---- Assert
     vm.expectRevert(VaultManager.VaultManager__InvalidPhase.selector);
 
     // ---- Act
-    vm.prank(owner);
-    vault.exactInputSingle(
-      ISwapRouter.ExactInputSingleParams({
-        tokenIn: address(usdc),
-        tokenOut: address(usdc),
-        fee: 3000,
-        recipient: address(vault),
-        amountIn: 1e6,
-        amountOutMinimum: 0,
-        sqrtPriceLimitX96: 0
-      })
-    );
+    _exactInputSingleAs(owner, address(usdc), address(usdc), 1e6);
   }
 
   function test_Allows_PostUnlock_SwapToWETH() public {
     // ---- Arrange
-    vm.warp(vault.UNLOCK_TIMESTAMP() + 1);
+    _warpToPostUnlock();
     _fundVault(address(usdc), 2e6);
 
     // ---- Act
-    vm.prank(owner);
-    vault.exactInputSingle(
-      ISwapRouter.ExactInputSingleParams({
-        tokenIn: address(usdc),
-        tokenOut: address(weth),
-        fee: 3000,
-        recipient: address(vault),
-        amountIn: 2e6,
-        amountOutMinimum: 0,
-        sqrtPriceLimitX96: 0
-      })
-    );
+    _exactInputSingleAs(owner, address(usdc), address(weth), 2e6);
 
     // ---- Assert
     assertEq(usdc.balanceOf(address(vault)), 0);
     assertEq(weth.balanceOf(address(vault)), 4e6);
+  }
+
+  function test_AgentCanSwapInLockedPhase() public {
+    uint256 amountIn = 1_000_000;
+    _fundVault(address(usdc), amountIn);
+
+    _exactInputSingleAs(agent, address(usdc), address(weth), amountIn);
+
+    assertEq(usdc.balanceOf(address(vault)), 0);
+    assertEq(weth.balanceOf(address(vault)), amountIn * 2);
+  }
+
+  function test_RevertIf_CallerNotAgentOrOwner_Swap() public {
+    _fundVault(address(usdc), 1e6);
+    vm.expectRevert(VaultManager.VaultManager__InvalidAddress.selector);
+    _exactInputSingleAs(user, address(usdc), address(weth), 1e6);
   }
 }
 
 contract Supply is VaultManagerTest {
   function test_RevertIf_AmountZero() public {
     vm.expectRevert(VaultManager.VaultManager__AmountZero.selector);
-    vm.prank(owner);
-    vault.supply(address(usdc), 0);
+    _supplyAs(owner, address(usdc), 0);
   }
 
   function test_RevertIf_CometNotAllowedOrUnset() public {
@@ -289,8 +288,7 @@ contract Supply is VaultManagerTest {
     vm.prank(owner);
     vault.setAllowedAsset(otherAsset, true);
     vm.expectRevert(VaultManager.VaultManager__CometNotAllowed.selector);
-    vm.prank(owner);
-    vault.supply(otherAsset, 1);
+    _supplyAs(owner, otherAsset, 1);
   }
 
   function test_DepositsAssetToComet() public {
@@ -299,8 +297,7 @@ contract Supply is VaultManagerTest {
     _fundVault(address(usdc), amount);
 
     // ---- Act
-    vm.prank(owner);
-    vault.supply(address(usdc), amount);
+    _supplyAs(owner, address(usdc), amount);
 
     // ---- Assert
     assertEq(usdc.balanceOf(address(vault)), 0);
@@ -316,30 +313,36 @@ contract Supply is VaultManagerTest {
     emit VaultManager.CometSupplied(address(comet), address(usdc), amount);
 
     // ---- Act (event only)
-    vm.prank(owner);
-    vault.supply(address(usdc), amount);
+    _supplyAs(owner, address(usdc), amount);
   }
 
   function testFuzz_RevertIf_AssetNotAllowed(address _asset) public {
     vm.assume(_asset != address(usdc) && _asset != address(weth) && _asset != address(0));
     _fundVault(address(usdc), 1e6);
     vm.expectRevert(VaultManager.VaultManager__AssetNotAllowed.selector);
-    vm.prank(owner);
-    vault.supply(_asset, 1e6);
+    _supplyAs(owner, _asset, 1e6);
   }
 
   function test_RevertIf_CallerNotAgentOrOwner() public {
     vm.expectRevert(VaultManager.VaultManager__InvalidAddress.selector);
-    vm.prank(user);
-    vault.supply(address(usdc), 1);
+    _supplyAs(user, address(usdc), 1);
+  }
+
+  function test_AgentCanSupply() public {
+    uint256 amount = 5e6;
+    _fundVault(address(usdc), amount);
+
+    _supplyAs(agent, address(usdc), amount);
+
+    assertEq(usdc.balanceOf(address(vault)), 0);
+    assertEq(comet.balanceOf(address(vault)), amount);
   }
 }
 
 contract Withdraw is VaultManagerTest {
   function test_RevertIf_AmountZero() public {
     vm.expectRevert(VaultManager.VaultManager__AmountZero.selector);
-    vm.prank(owner);
-    vault.withdraw(address(usdc), 0);
+    _withdrawAs(owner, address(usdc), 0);
   }
 
   function test_RevertIf_CometNotAllowedOrUnset() public {
@@ -347,27 +350,23 @@ contract Withdraw is VaultManagerTest {
     vm.prank(owner);
     vault.setAllowedAsset(otherAsset, true);
     vm.expectRevert(VaultManager.VaultManager__CometNotAllowed.selector);
-    vm.prank(owner);
-    vault.withdraw(otherAsset, 1);
+    _withdrawAs(owner, otherAsset, 1);
   }
 
   function test_RevertIf_AssetNotAllowed() public {
     address otherAsset = makeAddr("OtherAsset_NotAllowed");
     vm.expectRevert(VaultManager.VaultManager__AssetNotAllowed.selector);
-    vm.prank(owner);
-    vault.withdraw(otherAsset, 1);
+    _withdrawAs(owner, otherAsset, 1);
   }
 
   function test_WithdrawsAssetFromComet() public {
     // ---- Arrange
     uint256 amount = 3e6;
     _fundVault(address(usdc), amount);
-    vm.prank(owner);
-    vault.supply(address(usdc), amount);
+    _supplyAs(owner, address(usdc), amount);
 
     // ---- Act
-    vm.prank(owner);
-    vault.withdraw(address(usdc), amount);
+    _withdrawAs(owner, address(usdc), amount);
 
     // ---- Assert
     assertEq(usdc.balanceOf(address(vault)), amount);
@@ -378,15 +377,33 @@ contract Withdraw is VaultManagerTest {
     // ---- Arrange
     uint256 amount = 4e6;
     _fundVault(address(usdc), amount);
-    vm.prank(owner);
-    vault.supply(address(usdc), amount);
+    _supplyAs(owner, address(usdc), amount);
 
     vm.expectEmit();
     emit VaultManager.CometWithdrawn(address(comet), address(usdc), amount);
 
     // ---- Act (event only)
-    vm.prank(owner);
-    vault.withdraw(address(usdc), amount);
+    _withdrawAs(owner, address(usdc), amount);
+  }
+
+  function test_AgentCanWithdraw() public {
+    uint256 amount = 3e6;
+    _fundVault(address(usdc), amount);
+    _supplyAs(owner, address(usdc), amount);
+
+    _withdrawAs(agent, address(usdc), amount);
+
+    assertEq(usdc.balanceOf(address(vault)), amount);
+    assertEq(comet.balanceOf(address(vault)), 0);
+  }
+
+  function test_RevertIf_CallerNotAgentOrOwner_Withdraw() public {
+    uint256 amount = 1e6;
+    _fundVault(address(usdc), amount);
+    _supplyAs(owner, address(usdc), amount);
+
+    vm.expectRevert(VaultManager.VaultManager__InvalidAddress.selector);
+    _withdrawAs(user, address(usdc), amount);
   }
 }
 
@@ -395,8 +412,7 @@ contract ClaimComp is VaultManagerTest {
     vm.prank(owner);
     vault.setAllowedComet(address(comet), true);
     vm.expectRevert(VaultManager.VaultManager__InvalidAddress.selector);
-    vm.prank(owner);
-    vault.claimComp(address(comet), address(0));
+    _claimCompAs(owner, address(comet), address(0));
   }
 
   function test_ClaimsRewards() public {
@@ -405,8 +421,7 @@ contract ClaimComp is VaultManagerTest {
     cometRewards.setClaimAmount(address(comet), expected);
 
     // ---- Act
-    vm.prank(owner);
-    uint256 claimed = vault.claimComp(address(comet), user);
+    uint256 claimed = _claimCompAs(owner, address(comet), user);
 
     // ---- Assert
     assertEq(claimed, expected);
@@ -421,16 +436,28 @@ contract ClaimComp is VaultManagerTest {
     emit VaultManager.CompClaimed(address(comet), user, expected);
 
     // ---- Act (event only)
-    vm.prank(owner);
-    vault.claimComp(address(comet), user);
+    _claimCompAs(owner, address(comet), user);
   }
 
   function testFuzz_RevertIf_CometNotAllowed(address _comet, address _to) public {
     vm.assume(_comet != address(comet) && _comet != address(0));
     vm.assume(_to != address(0));
     vm.expectRevert(VaultManager.VaultManager__CometNotAllowed.selector);
-    vm.prank(owner);
-    vault.claimComp(_comet, _to);
+    _claimCompAs(owner, _comet, _to);
+  }
+
+  function test_AgentCanClaimRewards() public {
+    uint256 expected = 11e18;
+    cometRewards.setClaimAmount(address(comet), expected);
+
+    uint256 claimed = _claimCompAs(agent, address(comet), user);
+    assertEq(claimed, expected);
+  }
+
+  function test_RevertIf_CallerNotAgentOrOwner_ClaimComp() public {
+    cometRewards.setClaimAmount(address(comet), 1e18);
+    vm.expectRevert(VaultManager.VaultManager__InvalidAddress.selector);
+    _claimCompAs(user, address(comet), user);
   }
 }
 
@@ -441,7 +468,7 @@ contract GetCurrentPhase is VaultManagerTest {
 
   function test_ReturnsConsolidationPostUnlockWithNonWethBalance() public {
     // ---- Arrange
-    vm.warp(vault.UNLOCK_TIMESTAMP() + 1);
+    _warpToPostUnlock();
     _fundVault(address(usdc), 1e6);
 
     // ---- Assert
@@ -451,7 +478,7 @@ contract GetCurrentPhase is VaultManagerTest {
 
   function test_ReturnsRedemptionPostUnlockWhenConsolidated() public {
     // ---- Arrange
-    vm.warp(vault.UNLOCK_TIMESTAMP() + 1);
+    _warpToPostUnlock();
     // no non-WETH balances and no comet position
 
     // ---- Assert
@@ -463,10 +490,8 @@ contract GetCurrentPhase is VaultManagerTest {
     uint256 amount = 1e6;
 
     _fundVault(address(usdc), amount);
-    vm.prank(owner);
-    vault.supply(address(usdc), amount);
-
-    vm.warp(vault.UNLOCK_TIMESTAMP() + 1);
+    _supplyAs(owner, address(usdc), amount);
+    _warpToPostUnlock();
 
     assertEq(usdc.balanceOf(address(vault)), 0);
     assertEq(comet.balanceOf(address(vault)), amount);
@@ -477,18 +502,15 @@ contract GetCurrentPhase is VaultManagerTest {
 
 contract RedeemWETH is VaultManagerTest {
   function test_RevertIf_AmountZero() public {
-    vm.warp(vault.UNLOCK_TIMESTAMP() + 1);
+    _warpToPostUnlock();
     vm.expectRevert(VaultManager.VaultManager__AmountZero.selector);
     vault.redeemWETH(0, user);
   }
 
   function test_RevertIf_InvalidToAddress() public {
-    vm.warp(vault.UNLOCK_TIMESTAMP() + 1);
-    _mintMtTo(user, 1 ether);
-    vm.prank(admin);
-    mtToken.grantRole(BURNER_ROLE, address(vault));
-    vm.prank(user);
-    mtToken.approve(address(vault), 1 ether);
+    _warpToPostUnlock();
+    _mintAndApproveMt(user, 1 ether);
+    _grantVaultBurner();
     vm.expectRevert(VaultManager.VaultManager__InvalidAddress.selector);
     vm.prank(user);
     vault.redeemWETH(1 ether, address(0));
@@ -503,16 +525,11 @@ contract RedeemWETH is VaultManagerTest {
 
   function test_RedeemsProRataWETHInRedemptionPhase() public {
     // ---- Arrange
-    vm.warp(vault.UNLOCK_TIMESTAMP() + 1);
     uint256 totalWeth = 100 ether;
-    _fundVault(address(weth), totalWeth);
+    _enterRedemptionWithWETH(totalWeth);
 
     uint256 userMt = 10 ether;
-    _mintMtTo(user, userMt);
-
-    // User must approve the vault for burning its MT
-    vm.prank(user);
-    mtToken.approve(address(vault), userMt);
+    _mintAndApproveMt(user, userMt);
 
     uint256 totalSupply = mtToken.totalSupply();
     uint256 expectedWeth = (totalWeth * userMt) / totalSupply;
@@ -529,14 +546,11 @@ contract RedeemWETH is VaultManagerTest {
 
   function test_EmitsRedeemedEvent() public {
     // ---- Arrange
-    vm.warp(vault.UNLOCK_TIMESTAMP() + 1);
     uint256 totalWeth = 10 ether;
-    _fundVault(address(weth), totalWeth);
+    _enterRedemptionWithWETH(totalWeth);
 
     uint256 userMt = 1 ether;
-    _mintMtTo(user, userMt);
-    vm.prank(user);
-    mtToken.approve(address(vault), userMt);
+    _mintAndApproveMt(user, userMt);
 
     uint256 expectedWeth = (totalWeth * userMt) / mtToken.totalSupply();
 
@@ -551,9 +565,7 @@ contract RedeemWETH is VaultManagerTest {
   function test_RevertIf_NotInRedemptionPhase() public {
     // ---- Arrange
     _fundVault(address(weth), 10 ether);
-    _mintMtTo(user, 1 ether);
-    vm.prank(user);
-    mtToken.approve(address(vault), 1 ether);
+    _mintAndApproveMt(user, 1 ether);
 
     vm.expectRevert(VaultManager.VaultManager__InvalidPhase.selector);
 
@@ -722,18 +734,7 @@ contract Pause is VaultManagerTest {
     vm.expectRevert(Pausable.EnforcedPause.selector);
 
     // ---- Act
-    vm.prank(owner);
-    vault.exactInputSingle(
-      ISwapRouter.ExactInputSingleParams({
-        tokenIn: address(usdc),
-        tokenOut: address(weth),
-        fee: 3000,
-        recipient: address(vault),
-        amountIn: 1e6,
-        amountOutMinimum: 0,
-        sqrtPriceLimitX96: 0
-      })
-    );
+    _exactInputSingleAs(owner, address(usdc), address(weth), 1e6);
   }
 
   function test_UnpausesAndAllowsSwap() public {
@@ -746,48 +747,9 @@ contract Pause is VaultManagerTest {
     assertFalse(vault.paused());
 
     // ---- Act
-    vm.prank(owner);
-    vault.exactInputSingle(
-      ISwapRouter.ExactInputSingleParams({
-        tokenIn: address(usdc),
-        tokenOut: address(weth),
-        fee: 3000,
-        recipient: address(vault),
-        amountIn: 1e6,
-        amountOutMinimum: 0,
-        sqrtPriceLimitX96: 0
-      })
-    );
+    _exactInputSingleAs(owner, address(usdc), address(weth), 1e6);
 
     // ---- Assert
     assertEq(weth.balanceOf(address(vault)), 2e6);
-  }
-}
-
-contract Sweep is VaultManagerTest {
-  function test_RevertIf_SweepingWETHDuringRedemption() public {
-    // ---- Arrange
-    vm.warp(vault.UNLOCK_TIMESTAMP() + 1);
-    _fundVault(address(weth), 5 ether);
-
-    // ---- Assert
-    vm.expectRevert(VaultManager.VaultManager__SweepRestricted.selector);
-
-    // ---- Act
-    vm.prank(owner);
-    vault.sweep(address(weth), owner);
-  }
-
-  function test_AllowsSweepOfUSDC() public {
-    // ---- Arrange
-    _fundVault(address(usdc), 1e6);
-
-    // ---- Act
-    vm.prank(owner);
-    vault.sweep(address(usdc), owner);
-
-    // ---- Assert
-    assertEq(usdc.balanceOf(owner), 1e6);
-    assertEq(usdc.balanceOf(address(vault)), 0);
   }
 }
