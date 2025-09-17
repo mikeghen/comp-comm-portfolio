@@ -7,7 +7,7 @@ import {AccessControl} from "openzeppelin/access/AccessControl.sol";
 import {ReentrancyGuard} from "openzeppelin/utils/ReentrancyGuard.sol";
 import {Pausable} from "openzeppelin/utils/Pausable.sol";
 import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
-import {CompCommToken} from "src/CompCommToken.sol";
+import {ManagementToken} from "src/ManagementToken.sol";
 import {ISwapRouter} from "src/interfaces/ISwapRouter.sol";
 import {IComet} from "src/interfaces/IComet.sol";
 import {ICometRewards} from "src/interfaces/ICometRewards.sol";
@@ -296,11 +296,11 @@ contract VaultManager is Ownable2Step, AccessControl, ReentrancyGuard, Pausable 
 
     // Calculate pro-rata based on pre-burn total supply
     uint256 wethBal = IERC20(WETH).balanceOf(address(this));
-    uint256 ts = CompCommToken(mtToken).totalSupply();
+    uint256 ts = ManagementToken(mtToken).totalSupply();
     uint256 wethOut = (wethBal * mtAmount) / ts;
 
     // Burn MT from sender using Vault's burner role
-    CompCommToken(mtToken).burnFrom(msg.sender, mtAmount);
+    ManagementToken(mtToken).burnFrom(msg.sender, mtAmount);
 
     IERC20(WETH).transfer(to, wethOut);
 
