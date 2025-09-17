@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {Test, console2} from "forge-std/Test.sol";
 import {PolicyManager} from "src/PolicyManager.sol";
-import {CompCommToken} from "src/CompCommToken.sol";
+import {ManagementToken} from "src/ManagementToken.sol";
 import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 
@@ -11,7 +11,7 @@ import {MockERC20} from "test/mocks/MockERC20.sol";
 /// @notice Test suite for PolicyManager contract following ScopeLift testing standards.
 contract PolicyManagerTest is Test {
     PolicyManager policyManager;
-    CompCommToken mtToken;
+    ManagementToken mtToken;
     MockERC20 usdc;
     address admin;
     address dev;
@@ -31,7 +31,7 @@ contract PolicyManagerTest is Test {
 
         // Deploy MT token
         vm.prank(admin);
-        mtToken = new CompCommToken(admin);
+        mtToken = new ManagementToken(admin);
         vm.label(address(mtToken), "MT Token");
 
         // Deploy PolicyManager

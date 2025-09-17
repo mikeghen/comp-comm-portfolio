@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test, console2} from "forge-std/Test.sol";
-import {CompCommToken} from "src/CompCommToken.sol";
+import {ManagementToken} from "src/ManagementToken.sol";
 import {ERC20} from "openzeppelin/token/ERC20/ERC20.sol";
 import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
 import {AccessControl} from "openzeppelin/access/AccessControl.sol";
@@ -10,8 +10,8 @@ import {IAccessControl} from "openzeppelin/access/IAccessControl.sol";
 import {Pausable} from "openzeppelin/utils/Pausable.sol";
 import {IERC20Errors} from "openzeppelin/interfaces/draft-IERC6093.sol";
 
-contract CompCommTokenTest is Test {
-    CompCommToken token;
+contract ManagementTokenTest is Test {
+    ManagementToken token;
     address admin;
     address minter;
     address burner;
@@ -40,7 +40,7 @@ contract CompCommTokenTest is Test {
         vm.label(user1, "User1");
         vm.label(user2, "User2");
 
-        token = new CompCommToken(admin);
+        token = new ManagementToken(admin);
 
         // Grant roles
         vm.startPrank(admin);
@@ -81,7 +81,7 @@ contract CompCommTokenTest is Test {
     }
 }
 
-contract Constructor is CompCommTokenTest {
+contract Constructor is ManagementTokenTest {
     function test_SetsCorrectNameAndSymbol() public view {
         assertEq(token.name(), "CompComm Management Token");
         assertEq(token.symbol(), "MT");
@@ -106,7 +106,7 @@ contract Constructor is CompCommTokenTest {
     function testFuzz_SetsAdminToArbitraryAddress(address _admin) public {
         _assumeSafeAddress(_admin);
 
-        CompCommToken _token = new CompCommToken(_admin);
+        ManagementToken _token = new ManagementToken(_admin);
 
         assertTrue(_token.hasRole(DEFAULT_ADMIN_ROLE, _admin));
         assertEq(_token.name(), "CompComm Management Token");
@@ -114,12 +114,12 @@ contract Constructor is CompCommTokenTest {
     }
 
     function test_RevertIf_AdminIsZeroAddress() public {
-        vm.expectRevert(CompCommToken.CompCommToken__InvalidMintAddress.selector);
-        new CompCommToken(address(0));
+        vm.expectRevert(ManagementToken.ManagementToken__InvalidMintAddress.selector);
+        new ManagementToken(address(0));
     }
 }
 
-contract Mint is CompCommTokenTest {
+contract Mint is ManagementTokenTest {
     function testFuzz_MintsTokensToAddress(address _to, uint256 _amount) public {
         _assumeSafeAddress(_to);
         _amount = _boundMintAmount(_amount);
@@ -143,7 +143,7 @@ contract Mint is CompCommTokenTest {
 
         // ---- Arrange & Assert
         vm.expectEmit(true, true, true, true);
-        emit CompCommToken.TokensMinted(_to, _amount);
+        emit ManagementToken.TokensMinted(_to, _amount);
 
         // ---- Act
         vm.prank(minter);
@@ -182,7 +182,7 @@ contract Mint is CompCommTokenTest {
         _amount = _boundMintAmount(_amount);
 
         // ---- Arrange & Assert
-        vm.expectRevert(CompCommToken.CompCommToken__InvalidMintAddress.selector);
+        vm.expectRevert(ManagementToken.ManagementToken__InvalidMintAddress.selector);
 
         // ---- Act
         vm.prank(minter);
@@ -207,7 +207,7 @@ contract Mint is CompCommTokenTest {
     }
 }
 
-contract BurnFrom is CompCommTokenTest {
+contract BurnFrom is ManagementTokenTest {
     function testFuzz_BurnsTokensFromAccountWithSufficientBalance(
         address _account,
         uint256 _mintAmount,
@@ -245,7 +245,7 @@ contract BurnFrom is CompCommTokenTest {
         token.approve(burner, _amount);
 
         vm.expectEmit(true, true, true, true);
-        emit CompCommToken.TokensBurned(_account, _amount);
+        emit ManagementToken.TokensBurned(_account, _amount);
 
         // ---- Act
         vm.prank(burner);
@@ -328,7 +328,7 @@ contract BurnFrom is CompCommTokenTest {
 
     function test_RevertIf_AccountIsZeroAddress() public {
         // ---- Arrange & Assert
-        vm.expectRevert(CompCommToken.CompCommToken__InvalidBurnAddress.selector);
+        vm.expectRevert(ManagementToken.ManagementToken__InvalidBurnAddress.selector);
 
         // ---- Act
         vm.prank(burner);
@@ -345,7 +345,7 @@ contract BurnFrom is CompCommTokenTest {
         vm.prank(_account);
         token.approve(burner, _amount); // Approve the full amount
 
-        vm.expectRevert(CompCommToken.CompCommToken__InsufficientBalance.selector);
+        vm.expectRevert(ManagementToken.ManagementToken__InsufficientBalance.selector);
 
         // ---- Act
         vm.prank(burner);
@@ -362,7 +362,7 @@ contract BurnFrom is CompCommTokenTest {
         vm.prank(_account);
         token.approve(burner, _approval);
 
-        vm.expectRevert(CompCommToken.CompCommToken__InsufficientAllowance.selector);
+        vm.expectRevert(ManagementToken.ManagementToken__InsufficientAllowance.selector);
 
         // ---- Act
         vm.prank(burner);
@@ -370,7 +370,7 @@ contract BurnFrom is CompCommTokenTest {
     }
 }
 
-contract Pause is CompCommTokenTest {
+contract Pause is ManagementTokenTest {
     function test_PausesToken() public {
         // ---- Arrange
         assertFalse(token.paused());
@@ -386,7 +386,7 @@ contract Pause is CompCommTokenTest {
     function test_EmitsTransfersPausedEvent() public {
         // ---- Arrange & Assert
         vm.expectEmit(true, true, true, true);
-        emit CompCommToken.TransfersPaused(pauser);
+        emit ManagementToken.TransfersPaused(pauser);
 
         // ---- Act
         vm.prank(pauser);
@@ -430,7 +430,7 @@ contract Pause is CompCommTokenTest {
     }
 }
 
-contract Unpause is CompCommTokenTest {
+contract Unpause is ManagementTokenTest {
     function setUp() public override {
         super.setUp();
         // Start with token paused
@@ -453,7 +453,7 @@ contract Unpause is CompCommTokenTest {
     function test_EmitsTransfersUnpausedEvent() public {
         // ---- Arrange & Assert
         vm.expectEmit(true, true, true, true);
-        emit CompCommToken.TransfersUnpaused(pauser);
+        emit ManagementToken.TransfersUnpaused(pauser);
 
         // ---- Act
         vm.prank(pauser);
@@ -497,7 +497,7 @@ contract Unpause is CompCommTokenTest {
     }
 }
 
-contract Update is CompCommTokenTest {
+contract Update is ManagementTokenTest {
     function testFuzz_AllowsTransfersWhenNotPaused(address _from, address _to, uint256 _amount) public {
         _assumeSafeAddress(_from);
         _assumeSafeAddress(_to);
