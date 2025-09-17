@@ -670,11 +670,16 @@ contract SetAssetComet is VaultManagerTest {
     assertEq(vault.assetToComet(address(usdc)), c);
   }
 
-  function testFuzz_RevertIf_InvalidInputs(address _asset, address _comet) public {
-    vm.assume(_asset == address(0) || _comet == address(0));
+  function test_RevertIf_AssetIsZero() public {
     vm.expectRevert(VaultManager.VaultManager__InvalidAddress.selector);
     vm.prank(owner);
-    vault.setAssetComet(_asset, _comet);
+    vault.setAssetComet(address(0), address(comet));
+  }
+
+  function test_RevertIf_CometIsZero() public {
+    vm.expectRevert(VaultManager.VaultManager__InvalidAddress.selector);
+    vm.prank(owner);
+    vault.setAssetComet(address(usdc), address(0));
   }
 
   function test_EmitsAssetCometSetEvent() public {
