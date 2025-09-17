@@ -8,4 +8,7 @@
   ]
   src = "src"
 
+  [rpc_endpoints]
+  base_mainnet = "https://mainnet.base.org/"
+
   # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
