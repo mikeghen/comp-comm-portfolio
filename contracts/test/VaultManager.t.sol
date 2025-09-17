@@ -97,48 +97,28 @@ contract Constructor is VaultManagerTest {
   function test_RevertIf_ZeroAddress_USDC() public {
     vm.expectRevert(VaultManager.VaultManager__InvalidAddress.selector);
     new VaultManager(
-      address(0),
-      address(weth),
-      address(mtToken),
-      address(router),
-      address(cometRewards),
-      agent
+      address(0), address(weth), address(mtToken), address(router), address(cometRewards), agent
     );
   }
 
   function test_RevertIf_ZeroAddress_WETH() public {
     vm.expectRevert(VaultManager.VaultManager__InvalidAddress.selector);
     new VaultManager(
-      address(usdc),
-      address(0),
-      address(mtToken),
-      address(router),
-      address(cometRewards),
-      agent
+      address(usdc), address(0), address(mtToken), address(router), address(cometRewards), agent
     );
   }
 
   function test_RevertIf_ZeroAddress_Router() public {
     vm.expectRevert(VaultManager.VaultManager__InvalidAddress.selector);
     new VaultManager(
-      address(usdc),
-      address(weth),
-      address(mtToken),
-      address(0),
-      address(cometRewards),
-      agent
+      address(usdc), address(weth), address(mtToken), address(0), address(cometRewards), agent
     );
   }
 
   function test_RevertIf_ZeroAddress_CometRewards() public {
     vm.expectRevert(VaultManager.VaultManager__InvalidAddress.selector);
     new VaultManager(
-      address(usdc),
-      address(weth),
-      address(mtToken),
-      address(router),
-      address(0),
-      agent
+      address(usdc), address(weth), address(mtToken), address(router), address(0), agent
     );
   }
 }
@@ -811,4 +791,3 @@ contract Sweep is VaultManagerTest {
     assertEq(usdc.balanceOf(address(vault)), 0);
   }
 }
-
