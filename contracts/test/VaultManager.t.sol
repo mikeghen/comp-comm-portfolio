@@ -8,7 +8,7 @@ import {Pausable} from "openzeppelin/utils/Pausable.sol";
 
 import {VaultManager} from "src/VaultManager.sol";
 import {ISwapRouter} from "src/interfaces/ISwapRouter.sol";
-import {CompCommToken} from "src/CompCommToken.sol";
+import {ManagementToken} from "src/ManagementToken.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockSwapRouter} from "test/mocks/MockSwapRouter.sol";
 import {MockComet} from "test/mocks/MockComet.sol";
@@ -16,7 +16,7 @@ import {MockCometRewards} from "test/mocks/MockCometRewards.sol";
 
 contract VaultManagerTest is Test {
   VaultManager vault;
-  CompCommToken mtToken;
+  ManagementToken mtToken;
   MockERC20 usdc;
   MockERC20 weth;
   MockSwapRouter router;
@@ -46,7 +46,7 @@ contract VaultManagerTest is Test {
     cometRewards = new MockCometRewards();
 
     vm.prank(admin);
-    mtToken = new CompCommToken(admin);
+    mtToken = new ManagementToken(admin);
     // Grant MINTER_ROLE to admin for mint helper
     vm.prank(admin);
     mtToken.grantRole(MINTER_ROLE, admin);

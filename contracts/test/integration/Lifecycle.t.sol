@@ -7,7 +7,7 @@ import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
 import {VaultManager} from "src/VaultManager.sol";
 import {ISwapRouter} from "src/interfaces/ISwapRouter.sol";
 import {IComet} from "src/interfaces/IComet.sol";
-import {CompCommToken} from "src/CompCommToken.sol";
+import {ManagementToken} from "src/ManagementToken.sol";
 
 contract LifecycleIntegrationTest is Test {
   // ---- Base mainnet addresses ----
@@ -24,7 +24,7 @@ contract LifecycleIntegrationTest is Test {
   address constant COMET_REWARDS_DUMMY = 0x0000000000000000000000000000000000000001;
 
   VaultManager vault;
-  CompCommToken mtToken;
+  ManagementToken mtToken;
 
   uint256 constant USDC_DEPOSIT = 1000e6; // 1,000 USDC
   uint24[3] FEES = [uint24(500), uint24(3000), uint24(10_000)];
@@ -38,7 +38,7 @@ contract LifecycleIntegrationTest is Test {
     }
 
     // Deploy MT token and grant roles
-    mtToken = new CompCommToken(address(this));
+    mtToken = new ManagementToken(address(this));
     mtToken.grantRole(mtToken.MINTER_ROLE(), address(this));
 
     // Deploy vault with router02 and our MT token; owner/agent is this test contract
