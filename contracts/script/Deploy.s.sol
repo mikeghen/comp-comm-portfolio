@@ -51,7 +51,7 @@ contract Deploy is Script {
 
     // Grant MINTER_ROLE to PolicyManager so it can mint tokens
     console.log("Granting MINTER_ROLE to PolicyManager...");
-    compCommToken.grantRole(compCommToken.MINTER_ROLE(), address(policyManager));
+    managementToken.grantRole(managementToken.MINTER_ROLE(), address(policyManager));
 
     // Stop broadcasting
     vm.stopBroadcast();
@@ -92,7 +92,8 @@ contract Deploy is Script {
     console.log("=========================\n");
 
     // Verify role setup
-    bool hasMinterRole = managementToken.hasRole(managementToken.MINTER_ROLE(), address(policyManager));
+    bool hasMinterRole =
+      managementToken.hasRole(managementToken.MINTER_ROLE(), address(policyManager));
     console.log("PolicyManager has MINTER_ROLE:", hasMinterRole);
 
     bool adminHasAdminRole = managementToken.hasRole(managementToken.DEFAULT_ADMIN_ROLE(), admin);
