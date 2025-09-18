@@ -84,14 +84,13 @@ contract MessageManagerTest is Test {
   function _buildAndSign(uint256 payerPk, bytes32 contentHash, uint256 nonce)
     internal
     view
-    returns (MessageManager.Message memory m, bytes memory sig, bytes32 sigHash)
+    returns (MessageManager.Message memory m, bytes memory sig, bytes32 digest)
   {
     address _payer = vm.addr(payerPk);
     m = MessageManager.Message({messageHash: contentHash, payer: _payer, nonce: nonce});
     bytes32 structHash = _computeStructHash(m.messageHash, m.payer, m.nonce);
-    bytes32 digest = _computeDigest(structHash);
+    digest = _computeDigest(structHash);
     sig = _signDigest(payerPk, digest);
-    sigHash = keccak256(sig);
   }
 }
 
@@ -140,7 +139,7 @@ contract PayForMessageWithSig is MessageManagerTest {
     uint256 payerPk = 0xA11CE;
     address _payer = vm.addr(payerPk);
     bytes32 contentHash = keccak256("hello world");
-    (MessageManager.Message memory m, bytes memory sig, bytes32 sigHash) =
+    (MessageManager.Message memory m, bytes memory sig, bytes32 digest) =
       _buildAndSign(payerPk, contentHash, 1);
 
     // Fund and approve payer
@@ -153,14 +152,14 @@ contract PayForMessageWithSig is MessageManagerTest {
 
     // Expect event
     vm.expectEmit(true, true, true, true);
-    emit MessageManager.MessagePaid(sigHash, _payer, "ipfs://msg", contentHash, userMint, devMint);
+    emit MessageManager.MessagePaid(digest, _payer, "ipfs://msg", contentHash, userMint, devMint);
 
     // ---- Act
     vm.prank(_payer);
     messageManager.payForMessageWithSig(m, sig, "ipfs://msg");
 
     // ---- Assert
-    assertTrue(messageManager.paidMessages(sigHash));
+    assertTrue(messageManager.paidMessages(digest));
     assertEq(usdc.balanceOf(address(messageManager)), price);
     assertEq(mtToken.balanceOf(_payer), userMint);
     assertEq(mtToken.balanceOf(dev), devMint);
@@ -171,7 +170,7 @@ contract PayForMessageWithSig is MessageManagerTest {
     uint256 payerPk = 0xB0B;
     address _payer = vm.addr(payerPk);
     bytes32 contentHash = keccak256("relayed message");
-    (MessageManager.Message memory m, bytes memory sig, bytes32 sigHash) =
+    (MessageManager.Message memory m, bytes memory sig, bytes32 digest) =
       _buildAndSign(payerPk, contentHash, 5);
 
     uint256 price = messageManager.MESSAGE_PRICE_USDC();
@@ -183,7 +182,7 @@ contract PayForMessageWithSig is MessageManagerTest {
     messageManager.payForMessageWithSig(m, sig, "ar://relayed");
 
     // ---- Assert
-    assertTrue(messageManager.paidMessages(sigHash));
+    assertTrue(messageManager.paidMessages(digest));
     assertEq(usdc.balanceOf(address(messageManager)), price);
   }
 
@@ -192,12 +191,10 @@ contract PayForMessageWithSig is MessageManagerTest {
     uint256 payerPk = 0xC0FFEE;
     address _payer = vm.addr(payerPk);
     bytes32 contentHash = keccak256("bad sig");
-    (MessageManager.Message memory m,,) = _buildAndSign(payerPk, contentHash, 7);
+    (MessageManager.Message memory m,, bytes32 digest) = _buildAndSign(payerPk, contentHash, 7);
 
     // Sign with wrong key
     uint256 wrongPk = 0xBAD;
-    bytes32 structHash = _computeStructHash(m.messageHash, m.payer, m.nonce);
-    bytes32 digest = _computeDigest(structHash);
     bytes memory invalidSig = _signDigest(wrongPk, digest);
 
     _mintUsdcTo(_payer, messageManager.MESSAGE_PRICE_USDC());
@@ -207,27 +204,32 @@ contract PayForMessageWithSig is MessageManagerTest {
     messageManager.payForMessageWithSig(m, invalidSig, "uri");
   }
 
-  function test_RevertIf_ReplayedSignature() public {
+  function test_RevertIf_ReplayedSameDigestWithDifferentSignatureEncodings() public {
     // ---- Arrange
     uint256 payerPk = 0xD00D;
     address _payer = vm.addr(payerPk);
     bytes32 contentHash = keccak256("replay");
-    (MessageManager.Message memory m, bytes memory sig, bytes32 sigHash) =
+    (MessageManager.Message memory m, bytes memory sig65, bytes32 digest) =
       _buildAndSign(payerPk, contentHash, 123);
 
     uint256 price = messageManager.MESSAGE_PRICE_USDC();
     _mintUsdcTo(_payer, price * 2);
     _approveUsdcFrom(_payer, type(uint256).max);
 
-    // First call succeeds
-    messageManager.payForMessageWithSig(m, sig, "uri");
+    // First call succeeds with 65-byte signature
+    messageManager.payForMessageWithSig(m, sig65, "uri");
 
-    // Second call with same signature should revert
+    // Build compact 64-byte (EIP-2098) signature for the same digest
+    (uint8 v, bytes32 r, bytes32 s) = vm.sign(payerPk, digest);
+    bytes32 vs = bytes32(uint256(s) | (uint256(v - 27) << 255));
+    bytes memory sig64 = abi.encodePacked(r, vs);
+
+    // Second call should revert due to same digest already paid
     vm.expectRevert(MessageManager.MessageManager__AlreadyPaid.selector);
-    messageManager.payForMessageWithSig(m, sig, "uri");
+    messageManager.payForMessageWithSig(m, sig64, "uri");
 
-    // Ensure mapping set
-    assertTrue(messageManager.paidMessages(sigHash));
+    // Ensure mapping set on digest
+    assertTrue(messageManager.paidMessages(digest));
   }
 
   function test_RevertIf_TamperedMessageAfterSigning() public {
@@ -253,16 +255,21 @@ contract PayForMessageWithSig is MessageManagerTest {
     uint256 payerPk = 0xACDC;
     address _payer = vm.addr(payerPk);
     bytes32 contentHash = keccak256("same content");
-    (MessageManager.Message memory m1, bytes memory sig1,) = _buildAndSign(payerPk, contentHash, 1);
-    (MessageManager.Message memory m2, bytes memory sig2,) = _buildAndSign(payerPk, contentHash, 2);
+    (MessageManager.Message memory m1, bytes memory sig1, bytes32 digest1) =
+      _buildAndSign(payerPk, contentHash, 1);
+    (MessageManager.Message memory m2, bytes memory sig2, bytes32 digest2) =
+      _buildAndSign(payerPk, contentHash, 2);
 
     uint256 price = messageManager.MESSAGE_PRICE_USDC();
     _mintUsdcTo(_payer, price * 2);
     _approveUsdcFrom(_payer, type(uint256).max);
 
-    // ---- Act & Assert: both succeed because signatures differ (nonce)
+    // ---- Act & Assert: both succeed because digests differ (nonce)
     messageManager.payForMessageWithSig(m1, sig1, "uri1");
     messageManager.payForMessageWithSig(m2, sig2, "uri2");
+
+    assertTrue(messageManager.paidMessages(digest1));
+    assertTrue(messageManager.paidMessages(digest2));
   }
 }
 
@@ -273,7 +280,7 @@ contract MarkMessageProcessed is MessageManagerTest {
     address _payer = vm.addr(payerPk);
     bytes32 contentHash = keccak256("process me");
 
-    (MessageManager.Message memory m, bytes memory sig, bytes32 sigHash) =
+    (MessageManager.Message memory m, bytes memory sig, bytes32 digest) =
       _buildAndSign(payerPk, contentHash, 42);
 
     // Fund and approve
@@ -285,16 +292,16 @@ contract MarkMessageProcessed is MessageManagerTest {
     // ---- Act
     vm.prank(agent);
     vm.expectEmit(true, true, true, true);
-    emit MessageManager.MessageProcessed(sigHash, agent);
-    messageManager.markMessageProcessed(sigHash);
+    emit MessageManager.MessageProcessed(digest, agent);
+    messageManager.markMessageProcessed(digest);
 
     // ---- Assert
-    assertTrue(messageManager.processedMessages(sigHash));
+    assertTrue(messageManager.processedMessages(digest));
   }
 
   function test_RevertIf_CalledByNonAgent(address _caller) public {
     vm.assume(_caller != agent);
-    bytes32 sigHash = keccak256("fake");
+    bytes32 digest = keccak256("fake");
 
     vm.expectRevert(
       abi.encodeWithSelector(
@@ -302,14 +309,14 @@ contract MarkMessageProcessed is MessageManagerTest {
       )
     );
     vm.prank(_caller);
-    messageManager.markMessageProcessed(sigHash);
+    messageManager.markMessageProcessed(digest);
   }
 
   function test_RevertIf_NotPaid() public {
-    bytes32 sigHash = keccak256("notpaid");
+    bytes32 digest = keccak256("notpaid");
     vm.prank(agent);
     vm.expectRevert(MessageManager.MessageManager__NotPaid.selector);
-    messageManager.markMessageProcessed(sigHash);
+    messageManager.markMessageProcessed(digest);
   }
 
   function test_RevertIf_AlreadyProcessed() public {
@@ -317,7 +324,7 @@ contract MarkMessageProcessed is MessageManagerTest {
     uint256 payerPk = 0xBBB;
     address _payer = vm.addr(payerPk);
     bytes32 contentHash = keccak256("double process");
-    (MessageManager.Message memory m, bytes memory sig, bytes32 sigHash) =
+    (MessageManager.Message memory m, bytes memory sig, bytes32 digest) =
       _buildAndSign(payerPk, contentHash, 99);
 
     _mintUsdcTo(_payer, messageManager.MESSAGE_PRICE_USDC());
@@ -325,12 +332,12 @@ contract MarkMessageProcessed is MessageManagerTest {
     messageManager.payForMessageWithSig(m, sig, "uri");
 
     vm.prank(agent);
-    messageManager.markMessageProcessed(sigHash);
+    messageManager.markMessageProcessed(digest);
 
     // ---- Assert
     vm.prank(agent);
     vm.expectRevert(MessageManager.MessageManager__AlreadyProcessed.selector);
-    messageManager.markMessageProcessed(sigHash);
+    messageManager.markMessageProcessed(digest);
   }
 }
 

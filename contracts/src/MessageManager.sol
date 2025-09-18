@@ -38,11 +38,11 @@ contract MessageManager is AccessControl, ReentrancyGuard, EIP712 {
     uint256 nonce;
   }
 
-  /// @notice Mapping of signature hash to payment status.
-  mapping(bytes32 sigHash => bool paid) public paidMessages;
+  /// @notice Mapping of EIP-712 message digest to payment status.
+  mapping(bytes32 digest => bool paid) public paidMessages;
 
-  /// @notice Mapping of signature hash to processed status.
-  mapping(bytes32 sigHash => bool processed) public processedMessages;
+  /// @notice Mapping of EIP-712 message digest to processed status.
+  mapping(bytes32 digest => bool processed) public processedMessages;
 
   /// @notice USDC token address.
   address public immutable USDC;
@@ -70,7 +70,7 @@ contract MessageManager is AccessControl, ReentrancyGuard, EIP712 {
     keccak256("Message(bytes32 messageHash,address payer,uint256 nonce)");
 
   /// @notice Emitted when a message is paid.
-  /// @param sigHash The hash of the signature used to authorize the payment.
+  /// @param sigHash The EIP-712 digest for the message (named for backwards compatibility).
   /// @param payer The address paying for the message.
   /// @param messageURI A human-readable URI/pointer to the message content.
   /// @param messageHash The keccak256 hash of the off-chain message content.
@@ -86,7 +86,7 @@ contract MessageManager is AccessControl, ReentrancyGuard, EIP712 {
   );
 
   /// @notice Emitted when a message is processed by the agent.
-  /// @param sigHash The hash of the signature for the previously paid message.
+  /// @param sigHash The EIP-712 digest for the previously paid message (name preserved).
   /// @param processor The address that processed the message (must have AGENT_ROLE).
   event MessageProcessed(bytes32 indexed sigHash, address indexed processor);
 
@@ -125,16 +125,15 @@ contract MessageManager is AccessControl, ReentrancyGuard, EIP712 {
     bytes32 structHash = keccak256(abi.encode(MESSAGE_TYPEHASH, m.messageHash, m.payer, m.nonce));
     bytes32 digest = _hashTypedDataV4(structHash);
 
-    // Use signature as replay key; alternatively use digest to avoid sig malleability concerns.
-    bytes32 sigHash = keccak256(sig);
-    if (paidMessages[sigHash]) revert MessageManager__AlreadyPaid();
+    // Use digest as replay key (robust to signature malleability variations like EIP-2098)
+    if (paidMessages[digest]) revert MessageManager__AlreadyPaid();
 
     // Validate signature from payer (EOA or ERC1271)
     bool isValid = SignatureChecker.isValidSignatureNow(m.payer, digest, sig);
     if (!isValid) revert MessageManager__InvalidSignature();
 
     // Mark paid before external calls (reentrancy safety)
-    paidMessages[sigHash] = true;
+    paidMessages[digest] = true;
 
     // Transfer fixed USDC price from payer to this contract
     IERC20(USDC).transferFrom(m.payer, address(this), MESSAGE_PRICE_USDC);
@@ -147,11 +146,11 @@ contract MessageManager is AccessControl, ReentrancyGuard, EIP712 {
     ManagementToken(MT_TOKEN).mint(m.payer, userMint);
     ManagementToken(MT_TOKEN).mint(DEV, devMint);
 
-    emit MessagePaid(sigHash, m.payer, messageURI, m.messageHash, userMint, devMint);
+    emit MessagePaid(digest, m.payer, messageURI, m.messageHash, userMint, devMint);
   }
 
   /// @notice Marks a previously paid message as processed. Only callable by agent role.
-  /// @param sigHash The hash of the signature used when paying for the message.
+  /// @param sigHash The EIP-712 digest used when paying for the message (name preserved).
   function markMessageProcessed(bytes32 sigHash) external onlyRole(AGENT_ROLE) {
     if (!paidMessages[sigHash]) revert MessageManager__NotPaid();
     if (processedMessages[sigHash]) revert MessageManager__AlreadyProcessed();
