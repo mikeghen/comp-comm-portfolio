@@ -2,20 +2,20 @@
 pragma solidity 0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
-import {CompCommToken} from "../src/CompCommToken.sol";
+import {ManagementToken} from "../src/ManagementToken.sol";
 import {PolicyManager} from "../src/PolicyManager.sol";
 
 /// @title Deploy
 /// @notice Deployment script for the CompComm Portfolio system contracts
-/// @dev Deploys CompCommToken and PolicyManager with proper role configuration
+/// @dev Deploys ManagementToken and PolicyManager with proper role configuration
 contract Deploy is Script {
-  /// @notice The deployed CompCommToken contract
-  CompCommToken public compCommToken;
+  /// @notice The deployed ManagementToken contract
+  ManagementToken public managementToken;
 
   /// @notice The deployed PolicyManager contract
   PolicyManager public policyManager;
 
-  /// @notice Admin address for the CompCommToken (from environment)
+  /// @notice Admin address for the ManagementToken (from environment)
   address public admin;
 
   /// @notice Dev share receiver address (from environment)
@@ -39,19 +39,19 @@ contract Deploy is Script {
     // Start broadcasting transactions
     vm.startBroadcast(deployerPrivateKey);
 
-    // Deploy CompCommToken
-    console.log("Deploying CompCommToken...");
-    compCommToken = new CompCommToken(admin);
-    console.log("CompCommToken deployed at:", address(compCommToken));
+    // Deploy ManagementToken
+    console.log("Deploying ManagementToken...");
+    managementToken = new ManagementToken(admin);
+    console.log("ManagementToken deployed at:", address(managementToken));
 
     // Deploy PolicyManager
     console.log("Deploying PolicyManager...");
-    policyManager = new PolicyManager(usdc, address(compCommToken), dev, initialPrompt);
+    policyManager = new PolicyManager(usdc, address(managementToken), dev, initialPrompt);
     console.log("PolicyManager deployed at:", address(policyManager));
 
     // Grant MINTER_ROLE to PolicyManager so it can mint tokens
     console.log("Granting MINTER_ROLE to PolicyManager...");
-    compCommToken.grantRole(compCommToken.MINTER_ROLE(), address(policyManager));
+    managementToken.grantRole(managementToken.MINTER_ROLE(), address(policyManager));
 
     // Stop broadcasting
     vm.stopBroadcast();
@@ -86,16 +86,17 @@ contract Deploy is Script {
     console.log("Admin Address:", admin);
     console.log("Dev Address:", dev);
     console.log("USDC Address:", usdc);
-    console.log("CompCommToken:", address(compCommToken));
+    console.log("ManagementToken:", address(managementToken));
     console.log("PolicyManager:", address(policyManager));
     console.log("Initial Prompt Length:", bytes(initialPrompt).length);
     console.log("=========================\n");
 
     // Verify role setup
-    bool hasMinterRole = compCommToken.hasRole(compCommToken.MINTER_ROLE(), address(policyManager));
+    bool hasMinterRole =
+      managementToken.hasRole(managementToken.MINTER_ROLE(), address(policyManager));
     console.log("PolicyManager has MINTER_ROLE:", hasMinterRole);
 
-    bool adminHasAdminRole = compCommToken.hasRole(compCommToken.DEFAULT_ADMIN_ROLE(), admin);
+    bool adminHasAdminRole = managementToken.hasRole(managementToken.DEFAULT_ADMIN_ROLE(), admin);
     console.log("Admin has DEFAULT_ADMIN_ROLE:", adminHasAdminRole);
   }
 }

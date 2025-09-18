@@ -6,22 +6,22 @@ import {ERC20Burnable} from "openzeppelin/token/ERC20/extensions/ERC20Burnable.s
 import {AccessControl} from "openzeppelin/access/AccessControl.sol";
 import {Pausable} from "openzeppelin/utils/Pausable.sol";
 
-/// @title CompCommToken
+/// @title ManagementToken
 /// @notice The governance and redemption token for the CompComm Portfolio system.
 /// @dev Implements ERC20 with burnable functionality, role-based access control, and pausable
 /// transfers.
-contract CompCommToken is ERC20, ERC20Burnable, AccessControl, Pausable {
+contract ManagementToken is ERC20, ERC20Burnable, AccessControl, Pausable {
   /// @notice Thrown when attempting to mint to the zero address.
-  error CompCommToken__InvalidMintAddress();
+  error ManagementToken__InvalidMintAddress();
 
   /// @notice Thrown when attempting to burn from the zero address.
-  error CompCommToken__InvalidBurnAddress();
+  error ManagementToken__InvalidBurnAddress();
 
   /// @notice Thrown when attempting to burn more tokens than the account has.
-  error CompCommToken__InsufficientBalance();
+  error ManagementToken__InsufficientBalance();
 
   /// @notice Thrown when attempting to burn more tokens than allowed.
-  error CompCommToken__InsufficientAllowance();
+  error ManagementToken__InsufficientAllowance();
 
   /// @notice Role for minting new tokens (granted to MessageManager and PolicyManager).
   bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
@@ -48,10 +48,10 @@ contract CompCommToken is ERC20, ERC20Burnable, AccessControl, Pausable {
   /// @notice Emitted when transfers are unpaused.
   event TransfersUnpaused(address account);
 
-  /// @notice Initializes the CompCommToken contract.
+  /// @notice Initializes the ManagementToken contract.
   /// @param _admin The address that will have admin role.
   constructor(address _admin) ERC20("CompComm Management Token", "MT") {
-    if (_admin == address(0)) revert CompCommToken__InvalidMintAddress();
+    if (_admin == address(0)) revert ManagementToken__InvalidMintAddress();
 
     _grantRole(DEFAULT_ADMIN_ROLE, _admin);
   }
@@ -61,7 +61,7 @@ contract CompCommToken is ERC20, ERC20Burnable, AccessControl, Pausable {
   /// @param amount The amount of tokens to mint.
   /// @dev Only callable by addresses with MINTER_ROLE.
   function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
-    if (to == address(0)) revert CompCommToken__InvalidMintAddress();
+    if (to == address(0)) revert ManagementToken__InvalidMintAddress();
 
     _mint(to, amount);
     emit TokensMinted(to, amount);
@@ -73,13 +73,13 @@ contract CompCommToken is ERC20, ERC20Burnable, AccessControl, Pausable {
   /// @dev Only callable by addresses with BURNER_ROLE.
   /// @dev Requires the caller to have allowance or BURNER_ROLE.
   function burnFrom(address account, uint256 amount) public override onlyRole(BURNER_ROLE) {
-    if (account == address(0)) revert CompCommToken__InvalidBurnAddress();
-    if (balanceOf(account) < amount) revert CompCommToken__InsufficientBalance();
+    if (account == address(0)) revert ManagementToken__InvalidBurnAddress();
+    if (balanceOf(account) < amount) revert ManagementToken__InsufficientBalance();
 
     // Check if caller has sufficient allowance or is the account owner
     if (msg.sender != account) {
       uint256 currentAllowance = allowance(account, msg.sender);
-      if (currentAllowance < amount) revert CompCommToken__InsufficientAllowance();
+      if (currentAllowance < amount) revert ManagementToken__InsufficientAllowance();
 
       // Reduce allowance
       _approve(account, msg.sender, currentAllowance - amount);

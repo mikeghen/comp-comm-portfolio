@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {AccessControl} from "openzeppelin/access/AccessControl.sol";
 import {ReentrancyGuard} from "openzeppelin/utils/ReentrancyGuard.sol";
 import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
-import {CompCommToken} from "./CompCommToken.sol";
+import {ManagementToken} from "./ManagementToken.sol";
 
 /// @title PolicyManager
 /// @notice Manages the on-chain investment policy with paid editing functionality.
@@ -174,7 +174,7 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
   /// @param to The address to mint tokens to.
   /// @param amount The amount of tokens to mint.
   function _mintMT(address to, uint256 amount) internal {
-    CompCommToken(MT_TOKEN).mint(to, amount);
+    ManagementToken(MT_TOKEN).mint(to, amount);
   }
 
   /// @notice Internal function to apply the edit to the prompt.

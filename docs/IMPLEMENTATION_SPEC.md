@@ -13,7 +13,7 @@ The CompComm Portfolio is a community-managed investment portfolio system that c
 
 ## Smart Contract Components
 
-### 1. `CompCommToken` (ERC20 Management Token)
+### 1. `ManagementToken` (ERC20 Management Token)
 The governance and redemption token for the CompComm Portfolio system.
 
 #### Inheritance
@@ -305,7 +305,7 @@ Comets: [cUSDCv3, cWETHv3, cAEROv3, sSUSDv3]
 ```
 
 ### Deployment Steps
-1. Deploy `CompCommToken` with proper roles
+1. Deploy `ManagementToken` with proper roles
 2. Deploy `CompCommPortfolio` with all parameters
 3. Grant `MINTER_ROLE` and `BURNER_ROLE` to portfolio contract
 4. Configure initial allowlists
