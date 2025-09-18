@@ -7,8 +7,6 @@ import {ManagementToken} from "src/ManagementToken.sol";
 import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 
-/// @title PolicyManagerTest
-/// @notice Test suite for PolicyManager contract following ScopeLift testing standards.
 contract PolicyManagerTest is Test {
   PolicyManager policyManager;
   ManagementToken mtToken;

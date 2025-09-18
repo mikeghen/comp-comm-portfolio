@@ -11,7 +11,7 @@ import {ManagementToken} from "./ManagementToken.sol";
 
 /// @title MessageManager
 /// @notice Handles USDC payments for AI agent messages and MT minting with replay protection.
-/// @dev Follows ScopeLift style; uses AccessControl for agent permissions and EIP-712 for auth.
+/// @dev Uses AccessControl for agent permissions and EIP-712 for auth.
 contract MessageManager is AccessControl, ReentrancyGuard, EIP712 {
   /// @notice Thrown when a message has already been paid.
   error MessageManager__AlreadyPaid();
