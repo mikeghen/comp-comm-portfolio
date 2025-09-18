@@ -81,11 +81,11 @@ contract MessageManagerTest is Test {
   }
 
   // Build the EIP-712 struct, sign it with payer's key, and return the tuple
-  function _buildAndSign(
-    uint256 payerPk,
-    bytes32 contentHash,
-    uint256 nonce
-  ) internal view returns (MessageManager.Message memory m, bytes memory sig, bytes32 sigHash) {
+  function _buildAndSign(uint256 payerPk, bytes32 contentHash, uint256 nonce)
+    internal
+    view
+    returns (MessageManager.Message memory m, bytes memory sig, bytes32 sigHash)
+  {
     address _payer = vm.addr(payerPk);
     m = MessageManager.Message({messageHash: contentHash, payer: _payer, nonce: nonce});
     bytes32 structHash = _computeStructHash(m.messageHash, m.payer, m.nonce);
@@ -115,8 +115,10 @@ contract Constructor is MessageManagerTest {
     address _agent,
     address _admin
   ) public {
-    vm.assume(_usdc == address(0) || _mt == address(0) || _dev == address(0) || _agent == address(0)
-      || _admin == address(0));
+    vm.assume(
+      _usdc == address(0) || _mt == address(0) || _dev == address(0) || _agent == address(0)
+        || _admin == address(0)
+    );
 
     vm.expectRevert(MessageManager.MessageManager__InvalidAddress.selector);
     new MessageManager(_usdc, _mt, _dev, _agent, _admin);
@@ -124,7 +126,6 @@ contract Constructor is MessageManagerTest {
 }
 
 contract PayForMessageWithSig is MessageManagerTest {
-
   function test_PaysWithValidSignature_FromPayerDirectly() public {
     // ---- Arrange
     uint256 payerPk = 0xA11CE;

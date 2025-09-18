@@ -99,11 +99,10 @@ contract MessageManager is AccessControl, ReentrancyGuard, EIP712 {
   constructor(address _usdc, address _mtToken, address _dev, address _agent, address _admin)
     EIP712("MessageManager", "1")
   {
-    if (_usdc == address(0) || _mtToken == address(0) || _dev == address(0) || _agent == address(0)
-      || _admin == address(0)
-    ) {
-      revert MessageManager__InvalidAddress();
-    }
+    if (
+      _usdc == address(0) || _mtToken == address(0) || _dev == address(0) || _agent == address(0)
+        || _admin == address(0)
+    ) revert MessageManager__InvalidAddress();
 
     USDC = _usdc;
     MT_TOKEN = _mtToken;
@@ -128,15 +127,11 @@ contract MessageManager is AccessControl, ReentrancyGuard, EIP712 {
 
     // Use signature as replay key; alternatively use digest to avoid sig malleability concerns.
     bytes32 sigHash = keccak256(sig);
-    if (paidMessages[sigHash]) {
-      revert MessageManager__AlreadyPaid();
-    }
+    if (paidMessages[sigHash]) revert MessageManager__AlreadyPaid();
 
     // Validate signature from payer (EOA or ERC1271)
     bool isValid = SignatureChecker.isValidSignatureNow(m.payer, digest, sig);
-    if (!isValid) {
-      revert MessageManager__InvalidSignature();
-    }
+    if (!isValid) revert MessageManager__InvalidSignature();
 
     // Mark paid before external calls (reentrancy safety)
     paidMessages[sigHash] = true;
@@ -158,12 +153,8 @@ contract MessageManager is AccessControl, ReentrancyGuard, EIP712 {
   /// @notice Marks a previously paid message as processed. Only callable by agent role.
   /// @param sigHash The hash of the signature used when paying for the message.
   function markMessageProcessed(bytes32 sigHash) external onlyRole(AGENT_ROLE) {
-    if (!paidMessages[sigHash]) {
-      revert MessageManager__NotPaid();
-    }
-    if (processedMessages[sigHash]) {
-      revert MessageManager__AlreadyProcessed();
-    }
+    if (!paidMessages[sigHash]) revert MessageManager__NotPaid();
+    if (processedMessages[sigHash]) revert MessageManager__AlreadyProcessed();
 
     processedMessages[sigHash] = true;
     emit MessageProcessed(sigHash, msg.sender);
@@ -174,5 +165,3 @@ contract MessageManager is AccessControl, ReentrancyGuard, EIP712 {
     return _domainSeparatorV4();
   }
 }
-
-
