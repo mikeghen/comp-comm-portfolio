@@ -108,20 +108,29 @@ contract Constructor is MessageManagerTest {
     assertTrue(messageManager.hasRole(messageManager.DEFAULT_ADMIN_ROLE(), admin));
   }
 
-  function testFuzz_RevertIf_ZeroAddressParams(
-    address _usdc,
-    address _mt,
-    address _dev,
-    address _agent,
-    address _admin
-  ) public {
-    vm.assume(
-      _usdc == address(0) || _mt == address(0) || _dev == address(0) || _agent == address(0)
-        || _admin == address(0)
-    );
-
+  function test_RevertIf_UsdcZeroAddress() public {
     vm.expectRevert(MessageManager.MessageManager__InvalidAddress.selector);
-    new MessageManager(_usdc, _mt, _dev, _agent, _admin);
+    new MessageManager(address(0), address(mtToken), dev, agent, admin);
+  }
+
+  function test_RevertIf_MtTokenZeroAddress() public {
+    vm.expectRevert(MessageManager.MessageManager__InvalidAddress.selector);
+    new MessageManager(address(usdc), address(0), dev, agent, admin);
+  }
+
+  function test_RevertIf_DevZeroAddress() public {
+    vm.expectRevert(MessageManager.MessageManager__InvalidAddress.selector);
+    new MessageManager(address(usdc), address(mtToken), address(0), agent, admin);
+  }
+
+  function test_RevertIf_AgentZeroAddress() public {
+    vm.expectRevert(MessageManager.MessageManager__InvalidAddress.selector);
+    new MessageManager(address(usdc), address(mtToken), dev, address(0), admin);
+  }
+
+  function test_RevertIf_AdminZeroAddress() public {
+    vm.expectRevert(MessageManager.MessageManager__InvalidAddress.selector);
+    new MessageManager(address(usdc), address(mtToken), dev, agent, address(0));
   }
 }
 
