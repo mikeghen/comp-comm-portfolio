@@ -53,9 +53,6 @@ contract MessageManager is AccessControl, ReentrancyGuard, EIP712 {
   /// @notice Dev share receiver.
   address public immutable DEV;
 
-  /// @notice Agent address for reference (not used for auth directly; see AGENT_ROLE).
-  address public immutable AGENT;
-
   /// @notice Message price: 10 USDC (6 decimals).
   uint256 public constant MESSAGE_PRICE_USDC = 10_000_000;
 
@@ -107,7 +104,6 @@ contract MessageManager is AccessControl, ReentrancyGuard, EIP712 {
     USDC = _usdc;
     MT_TOKEN = _mtToken;
     DEV = _dev;
-    AGENT = _agent;
 
     _grantRole(DEFAULT_ADMIN_ROLE, _admin);
     _grantRole(AGENT_ROLE, _agent);
