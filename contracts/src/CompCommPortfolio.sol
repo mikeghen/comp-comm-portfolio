@@ -57,7 +57,7 @@ contract CompCommPortfolio is Ownable2Step, AccessControl, ReentrancyGuard, Paus
     address _agent,
     address _admin,
     string memory _initialPrompt
-  ) Ownable(msg.sender) {
+  ) {
     // Deploy ManagementToken first
     managementToken = new ManagementToken(_admin);
     
