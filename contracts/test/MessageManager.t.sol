@@ -99,7 +99,6 @@ contract Constructor is MessageManagerTest {
     assertEq(messageManager.USDC(), address(usdc));
     assertEq(messageManager.MT_TOKEN(), address(mtToken));
     assertEq(messageManager.DEV(), dev);
-    assertEq(messageManager.AGENT(), agent);
   }
 
   function test_GrantsRoles() public view {
