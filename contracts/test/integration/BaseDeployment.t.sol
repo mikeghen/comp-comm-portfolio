@@ -36,11 +36,15 @@ contract BaseDeploymentIntegrationTest is Test {
   /// @notice Tests the complete deployment flow
   function test_DeploymentFlow() public {
     // Run the deployment
-    (managementToken, portfolio) = deployScript.run();
+    portfolio = deployScript.run();
+    managementToken = portfolio.managementToken();
     
     // Verify contracts are deployed
     assertNotEq(address(managementToken), address(0), "ManagementToken not deployed");
     assertNotEq(address(portfolio), address(0), "Portfolio not deployed");
+    assertNotEq(address(portfolio.messageManager()), address(0), "MessageManager not deployed");
+    assertNotEq(address(portfolio.policyManager()), address(0), "PolicyManager not deployed");
+    assertNotEq(address(portfolio.vaultManager()), address(0), "VaultManager not deployed");
     
     // Verify token configuration
     assertEq(managementToken.name(), "CompComm Management Token");
@@ -53,7 +57,8 @@ contract BaseDeploymentIntegrationTest is Test {
 
   /// @notice Tests admin role configuration
   function test_AdminRoleConfiguration() public {
-    (managementToken, portfolio) = deployScript.run();
+    portfolio = deployScript.run();
+    managementToken = portfolio.managementToken();
     
     // Verify admin has DEFAULT_ADMIN_ROLE on token
     assertTrue(
@@ -64,33 +69,44 @@ contract BaseDeploymentIntegrationTest is Test {
     // Verify portfolio is owner of VaultManager functions
     assertEq(portfolio.owner(), admin, "Admin should own portfolio");
     
-    // Verify portfolio has MINTER_ROLE
+    // Verify MessageManager has MINTER_ROLE
     assertTrue(
-      managementToken.hasRole(managementToken.MINTER_ROLE(), address(portfolio)),
-      "Portfolio should have MINTER_ROLE"
+      managementToken.hasRole(managementToken.MINTER_ROLE(), address(portfolio.messageManager())),
+      "MessageManager should have MINTER_ROLE"
     );
     
-    // Verify portfolio has BURNER_ROLE  
+    // Verify PolicyManager has MINTER_ROLE
     assertTrue(
-      managementToken.hasRole(managementToken.BURNER_ROLE(), address(portfolio)),
-      "Portfolio should have BURNER_ROLE"
+      managementToken.hasRole(managementToken.MINTER_ROLE(), address(portfolio.policyManager())),
+      "PolicyManager should have MINTER_ROLE"
+    );
+    
+    // Verify VaultManager has BURNER_ROLE  
+    assertTrue(
+      managementToken.hasRole(managementToken.BURNER_ROLE(), address(portfolio.vaultManager())),
+      "VaultManager should have BURNER_ROLE"
     );
   }
 
   /// @notice Tests agent role configuration
   function test_AgentRoleConfiguration() public {
-    (managementToken, portfolio) = deployScript.run();
+    portfolio = deployScript.run();
     
-    // Verify agent has AGENT_ROLE
+    // Verify agent has AGENT_ROLE in MessageManager and VaultManager
     assertTrue(
-      portfolio.hasRole(portfolio.AGENT_ROLE(), agent),
-      "Agent should have AGENT_ROLE"
+      portfolio.messageManager().hasRole(portfolio.messageManager().AGENT_ROLE(), agent),
+      "Agent should have AGENT_ROLE in MessageManager"
+    );
+    
+    assertTrue(
+      portfolio.vaultManager().hasRole(portfolio.vaultManager().AGENT_ROLE(), agent),
+      "Agent should have AGENT_ROLE in VaultManager"
     );
   }
 
   /// @notice Tests allowlist configuration
   function test_AllowlistConfiguration() public {
-    (managementToken, portfolio) = deployScript.run();
+    portfolio = deployScript.run();
     
     // Base mainnet addresses
     address BASE_USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
@@ -111,7 +127,7 @@ contract BaseDeploymentIntegrationTest is Test {
 
   /// @notice Tests policy manager initialization
   function test_PolicyManagerInitialization() public {
-    (managementToken, portfolio) = deployScript.run();
+    portfolio = deployScript.run();
     
     // Verify initial prompt is set
     assertEq(portfolio.prompt(), INITIAL_PROMPT, "Initial prompt should be set");
@@ -123,7 +139,7 @@ contract BaseDeploymentIntegrationTest is Test {
 
   /// @notice Tests message manager functionality
   function test_MessageManagerFunctionality() public {
-    (managementToken, portfolio) = deployScript.run();
+    portfolio = deployScript.run();
     
     // Verify constants
     assertEq(portfolio.MESSAGE_PRICE_USDC(), 10_000_000, "Message cost should be 10 USDC");
@@ -133,7 +149,7 @@ contract BaseDeploymentIntegrationTest is Test {
 
   /// @notice Tests vault manager timelock configuration  
   function test_VaultManagerTimelock() public {
-    (managementToken, portfolio) = deployScript.run();
+    portfolio = deployScript.run();
     
     // Verify timelock configuration
     assertEq(portfolio.LOCK_DURATION(), 46_656_000, "Lock duration should be 18 months");
@@ -147,7 +163,8 @@ contract BaseDeploymentIntegrationTest is Test {
 
   /// @notice Tests token minting functionality (simulated)
   function test_TokenMintingFunctionality() public {
-    (managementToken, portfolio) = deployScript.run();
+    portfolio = deployScript.run();
+    managementToken = portfolio.managementToken();
     
     // Simulate admin granting roles for testing
     vm.startPrank(admin);
@@ -164,7 +181,8 @@ contract BaseDeploymentIntegrationTest is Test {
 
   /// @notice Tests token burning functionality (simulated)
   function test_TokenBurningFunctionality() public {
-    (managementToken, portfolio) = deployScript.run();
+    portfolio = deployScript.run();
+    managementToken = portfolio.managementToken();
     
     vm.startPrank(admin);
     
@@ -200,7 +218,7 @@ contract BaseDeploymentIntegrationTest is Test {
 
   /// @notice Tests admin control functions
   function test_AdminControlFunctions() public {
-    (managementToken, portfolio) = deployScript.run();
+    portfolio = deployScript.run();
     
     vm.startPrank(admin);
     
@@ -227,7 +245,7 @@ contract BaseDeploymentIntegrationTest is Test {
 
   /// @notice Tests that non-admin cannot perform restricted actions
   function test_AccessControlRestrictions() public {
-    (managementToken, portfolio) = deployScript.run();
+    portfolio = deployScript.run();
     
     vm.startPrank(user);
     

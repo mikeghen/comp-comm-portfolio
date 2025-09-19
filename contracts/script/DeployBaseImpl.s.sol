@@ -9,7 +9,7 @@ import {CompCommPortfolio} from "../src/CompCommPortfolio.sol";
 /// @notice Base deployment implementation for the CompComm Portfolio system
 /// @dev Follows the modular pattern from withtally/staker for extensible deployments
 abstract contract DeployBaseImpl is Script {
-  /// @notice The deployed ManagementToken contract
+  /// @notice The deployed ManagementToken contract (reference from portfolio)
   ManagementToken public managementToken;
 
   /// @notice The deployed CompCommPortfolio contract
@@ -53,28 +53,14 @@ abstract contract DeployBaseImpl is Script {
   /// @return The portfolio configuration for the system
   function _portfolioConfiguration() internal virtual returns (PortfolioConfiguration memory);
 
-  /// @notice Deploys the ManagementToken contract
-  /// @return The deployed ManagementToken
-  function _deployManagementToken() internal returns (ManagementToken) {
-    console.log("Deploying ManagementToken...");
-    ManagementToken token = new ManagementToken(deployer);
-    console.log("ManagementToken deployed at:", address(token));
-    return token;
-  }
-
   /// @notice Deploys the CompCommPortfolio contract
-  /// @param _managementToken The deployed ManagementToken
   /// @param _config The portfolio configuration
   /// @return The deployed CompCommPortfolio
-  function _deployPortfolio(
-    ManagementToken _managementToken,
-    PortfolioConfiguration memory _config
-  ) internal returns (CompCommPortfolio) {
+  function _deployPortfolio(PortfolioConfiguration memory _config) internal returns (CompCommPortfolio) {
     console.log("Deploying CompCommPortfolio...");
     CompCommPortfolio portfolio = new CompCommPortfolio(
       _config.usdc,
       _config.weth,
-      address(_managementToken),
       _config.uniswapV3Router,
       _config.cometRewards,
       _config.dev,
@@ -87,18 +73,16 @@ abstract contract DeployBaseImpl is Script {
   }
 
   /// @notice Sets up roles and permissions
-  /// @param _token The ManagementToken contract
-  /// @param _portfolio The CompCommPortfolio contract
-  function _setupRoles(ManagementToken _token, CompCommPortfolio _portfolio) internal {
-    console.log("Setting up roles...");
+  /// @dev Roles are now set up automatically in the CompCommPortfolio constructor
+  function _setupRoles(ManagementToken _token, CompCommPortfolio _portfolio) internal view {
+    console.log("Roles set up automatically during deployment");
     
-    // Grant MINTER_ROLE to portfolio contract so it can mint tokens
-    console.log("Granting MINTER_ROLE to portfolio...");
-    _token.grantRole(_token.MINTER_ROLE(), address(_portfolio));
+    // Verify roles were set correctly
+    bool portfolioHasMinterRole = _token.hasRole(_token.MINTER_ROLE(), address(_portfolio.messageManager()));
+    bool portfolioHasBurnerRole = _token.hasRole(_token.BURNER_ROLE(), address(_portfolio.vaultManager()));
     
-    // Grant BURNER_ROLE to portfolio contract for redemptions
-    console.log("Granting BURNER_ROLE to portfolio...");
-    _token.grantRole(_token.BURNER_ROLE(), address(_portfolio));
+    require(portfolioHasMinterRole, "MessageManager should have MINTER_ROLE");
+    require(portfolioHasBurnerRole, "VaultManager should have BURNER_ROLE");
   }
 
   /// @notice Configures initial allowlists based on network
@@ -108,27 +92,27 @@ abstract contract DeployBaseImpl is Script {
   }
 
   /// @notice Transfers ownership to final admin
-  /// @param _token The ManagementToken contract
   /// @param _portfolio The CompCommPortfolio contract
   /// @param _baseConfig The base configuration
   function _transferOwnership(
-    ManagementToken _token,
     CompCommPortfolio _portfolio,
     BaseConfiguration memory _baseConfig
   ) internal {
     console.log("Transferring ownership to admin:", _baseConfig.admin);
     
     // Transfer admin role for ManagementToken
-    _token.grantRole(_token.DEFAULT_ADMIN_ROLE(), _baseConfig.admin);
-    _token.renounceRole(_token.DEFAULT_ADMIN_ROLE(), deployer);
+    ManagementToken token = _portfolio.managementToken();
+    token.grantRole(token.DEFAULT_ADMIN_ROLE(), _baseConfig.admin);
+    token.renounceRole(token.DEFAULT_ADMIN_ROLE(), deployer);
     
     // Transfer ownership of CompCommPortfolio (inherits from Ownable2Step)
     _portfolio.transferOwnership(_baseConfig.admin);
   }
 
   /// @notice Logs deployment summary
+  /// @param _portfolio The CompCommPortfolio contract
   /// @param _config The portfolio configuration
-  function _logDeploymentSummary(PortfolioConfiguration memory _config) internal view {
+  function _logDeploymentSummary(CompCommPortfolio _portfolio, PortfolioConfiguration memory _config) internal view {
     console.log("\n=== DEPLOYMENT SUMMARY ===");
     console.log("Network Chain ID:", block.chainid);
     console.log("Deployer:", deployer);
@@ -138,28 +122,38 @@ abstract contract DeployBaseImpl is Script {
     console.log("Comet Rewards:", _config.cometRewards);
     console.log("Dev:", _config.dev);
     console.log("Agent:", _config.agent);
-    console.log("ManagementToken:", address(managementToken));
-    console.log("CompCommPortfolio:", address(compCommPortfolio));
+    console.log("ManagementToken:", address(_portfolio.managementToken()));
+    console.log("MessageManager:", address(_portfolio.messageManager()));
+    console.log("PolicyManager:", address(_portfolio.policyManager()));
+    console.log("VaultManager:", address(_portfolio.vaultManager()));
+    console.log("CompCommPortfolio:", address(_portfolio));
     console.log("Initial Prompt Length:", bytes(_config.initialPrompt).length);
     console.log("=========================\n");
 
     // Verify role setup
-    bool portfolioHasMinterRole = managementToken.hasRole(
-      managementToken.MINTER_ROLE(), 
-      address(compCommPortfolio)
+    ManagementToken token = _portfolio.managementToken();
+    bool messageManagerHasMinterRole = token.hasRole(
+      token.MINTER_ROLE(), 
+      address(_portfolio.messageManager())
     );
-    console.log("Portfolio has MINTER_ROLE:", portfolioHasMinterRole);
+    console.log("MessageManager has MINTER_ROLE:", messageManagerHasMinterRole);
 
-    bool portfolioHasBurnerRole = managementToken.hasRole(
-      managementToken.BURNER_ROLE(), 
-      address(compCommPortfolio)
+    bool policyManagerHasMinterRole = token.hasRole(
+      token.MINTER_ROLE(), 
+      address(_portfolio.policyManager())
     );
-    console.log("Portfolio has BURNER_ROLE:", portfolioHasBurnerRole);
+    console.log("PolicyManager has MINTER_ROLE:", policyManagerHasMinterRole);
+
+    bool vaultManagerHasBurnerRole = token.hasRole(
+      token.BURNER_ROLE(), 
+      address(_portfolio.vaultManager())
+    );
+    console.log("VaultManager has BURNER_ROLE:", vaultManagerHasBurnerRole);
   }
 
   /// @notice Main deployment function
-  /// @return The deployed ManagementToken and CompCommPortfolio contracts
-  function run() public returns (ManagementToken, CompCommPortfolio) {
+  /// @return The deployed CompCommPortfolio contract
+  function run() public returns (CompCommPortfolio) {
     uint256 deployerPrivateKey = vm.envOr(
       "DEPLOYER_PRIVATE_KEY",
       uint256(0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80)
@@ -173,19 +167,21 @@ abstract contract DeployBaseImpl is Script {
     PortfolioConfiguration memory portfolioConfig = _portfolioConfiguration();
 
     // Deploy contracts
-    managementToken = _deployManagementToken();
-    compCommPortfolio = _deployPortfolio(managementToken, portfolioConfig);
+    compCommPortfolio = _deployPortfolio(portfolioConfig);
+    
+    // Get the deployed ManagementToken reference
+    managementToken = compCommPortfolio.managementToken();
 
     // Setup system
     _setupRoles(managementToken, compCommPortfolio);
     _configureAllowlists(compCommPortfolio);
-    _transferOwnership(managementToken, compCommPortfolio, baseConfig);
+    _transferOwnership(compCommPortfolio, baseConfig);
 
     vm.stopBroadcast();
 
     // Log summary
-    _logDeploymentSummary(portfolioConfig);
+    _logDeploymentSummary(compCommPortfolio, portfolioConfig);
 
-    return (managementToken, compCommPortfolio);
+    return compCommPortfolio;
   }
 }
