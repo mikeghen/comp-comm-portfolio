@@ -607,9 +607,216 @@ contract Constants is PolicyManagerTest {
     assertEq(policyManager.DEV_BPS(), 2000);
   }
 
+  function test_MaxPolicyLength() public view {
+    assertEq(policyManager.MAX_POLICY_LENGTH(), 2048);
+  }
+
   function test_MinterRoleConstant() public view {
     // Test that the MINTER_ROLE constant matches what's expected
     bytes32 expectedRole = keccak256("MINTER_ROLE");
     assertEq(MINTER_ROLE, expectedRole);
+  }
+}
+
+contract PolicyLengthValidation is PolicyManagerTest {
+  function test_ConstructorAcceptsValidLengthPolicy() public {
+    // ---- Arrange
+    string memory validPolicy = "A valid investment policy that is under 2048 characters.";
+    
+    // ---- Act
+    PolicyManager newPolicyManager = new PolicyManager(
+      address(usdc), 
+      address(mtToken), 
+      dev, 
+      validPolicy
+    );
+    
+    // ---- Assert
+    assertEq(newPolicyManager.prompt(), validPolicy);
+  }
+
+  function test_ConstructorAccepts2048CharacterPolicy() public {
+    // ---- Arrange
+    // Create exactly 2048 character string
+    bytes memory longPolicy = new bytes(2048);
+    for (uint256 i = 0; i < 2048; i++) {
+      longPolicy[i] = bytes1(uint8(65 + (i % 26))); // A-Z repeating
+    }
+    string memory policy2048 = string(longPolicy);
+    
+    // ---- Act
+    PolicyManager newPolicyManager = new PolicyManager(
+      address(usdc), 
+      address(mtToken), 
+      dev, 
+      policy2048
+    );
+    
+    // ---- Assert
+    assertEq(newPolicyManager.prompt(), policy2048);
+    assertEq(bytes(newPolicyManager.prompt()).length, 2048);
+  }
+
+  function test_ConstructorRejectsOversizedPolicy() public {
+    // ---- Arrange
+    // Create 2049 character string (1 over limit)
+    bytes memory longPolicy = new bytes(2049);
+    for (uint256 i = 0; i < 2049; i++) {
+      longPolicy[i] = bytes1(uint8(65 + (i % 26))); // A-Z repeating
+    }
+    string memory oversizedPolicy = string(longPolicy);
+    
+    // ---- Act & Assert
+    vm.expectRevert(PolicyManager.PolicyManager__PolicyTooLong.selector);
+    new PolicyManager(address(usdc), address(mtToken), dev, oversizedPolicy);
+  }
+
+  function testFuzz_ConstructorRejectsOversizedPolicy(uint256 _length) public {
+    // ---- Arrange
+    _length = bound(_length, 2049, 5000); // Test various oversized lengths
+    bytes memory longPolicy = new bytes(_length);
+    for (uint256 i = 0; i < _length; i++) {
+      longPolicy[i] = bytes1(uint8(65 + (i % 26))); // A-Z repeating
+    }
+    string memory oversizedPolicy = string(longPolicy);
+    
+    // ---- Act & Assert
+    vm.expectRevert(PolicyManager.PolicyManager__PolicyTooLong.selector);
+    new PolicyManager(address(usdc), address(mtToken), dev, oversizedPolicy);
+  }
+}
+
+contract EditPromptLengthValidation is PolicyManagerTest {
+  address user;
+
+  function setUp() public override {
+    super.setUp();
+    user = makeAddr("User");
+    vm.label(user, "User");
+  }
+
+  function _fundUserAndApprove(uint256 amount) internal {
+    usdc.mint(user, amount);
+    vm.prank(user);
+    usdc.approve(address(policyManager), type(uint256).max);
+  }
+
+  function test_EditPromptAcceptsValidResultLength() public {
+    // ---- Arrange
+    _fundUserAndApprove(1000e6);
+    string memory currentPrompt = policyManager.prompt();
+    uint256 currentLength = bytes(currentPrompt).length;
+    
+    // Replace first character with "X" - should still be valid
+    string memory replacement = "X";
+    
+    // ---- Act
+    vm.prank(user);
+    policyManager.editPrompt(0, 1, replacement);
+    
+    // ---- Assert
+    string memory newPrompt = policyManager.prompt();
+    assertEq(bytes(newPrompt).length, currentLength); // Same length
+  }
+
+  function test_EditPromptRejectsOversizedResult() public {
+    // ---- Arrange
+    _fundUserAndApprove(1000e6);
+    
+    // Create a policy manager with a policy close to the limit
+    bytes memory nearLimitPolicy = new bytes(2000);
+    for (uint256 i = 0; i < 2000; i++) {
+      nearLimitPolicy[i] = bytes1(uint8(65 + (i % 26)));
+    }
+    string memory policy2000 = string(nearLimitPolicy);
+    
+    PolicyManager nearLimitPolicyManager = new PolicyManager(
+      address(usdc), 
+      address(mtToken), 
+      dev, 
+      policy2000
+    );
+    
+    // Grant MINTER_ROLE to the new policy manager
+    vm.prank(admin);
+    mtToken.grantRole(MINTER_ROLE, address(nearLimitPolicyManager));
+    
+    // Try to add 50 characters, which would exceed the 2048 limit
+    string memory longReplacement = "AAAAAAAAAABBBBBBBBBBCCCCCCCCCCDDDDDDDDDDEEEEEEEEEE"; // 50 chars
+    
+    // ---- Act & Assert
+    vm.expectRevert(PolicyManager.PolicyManager__PolicyTooLong.selector);
+    vm.prank(user);
+    nearLimitPolicyManager.editPrompt(0, 1, longReplacement); // Replace 1 char with 50 chars
+  }
+
+  function test_EditPromptAllowsResultAt2048Chars() public {
+    // ---- Arrange
+    _fundUserAndApprove(1000e6);
+    
+    // Create a policy manager with a policy of 2047 characters
+    bytes memory policy2047 = new bytes(2047);
+    for (uint256 i = 0; i < 2047; i++) {
+      policy2047[i] = bytes1(uint8(65 + (i % 26)));
+    }
+    string memory policy2047Str = string(policy2047);
+    
+    PolicyManager policy2047Manager = new PolicyManager(
+      address(usdc), 
+      address(mtToken), 
+      dev, 
+      policy2047Str
+    );
+    
+    // Grant MINTER_ROLE to the new policy manager
+    vm.prank(admin);
+    mtToken.grantRole(MINTER_ROLE, address(policy2047Manager));
+    
+    // Add exactly 1 character to reach 2048
+    string memory singleChar = "X";
+    
+    // ---- Act
+    vm.prank(user);
+    policy2047Manager.editPrompt(2047, 2047, singleChar); // Insert at end
+    
+    // ---- Assert
+    string memory finalPrompt = policy2047Manager.prompt();
+    assertEq(bytes(finalPrompt).length, 2048); // Exactly at limit
+  }
+
+  function testFuzz_EditPromptRejectsOversizedResults(uint256 _excessLength) public {
+    // ---- Arrange
+    _excessLength = bound(_excessLength, 1, 100); // Test various excess amounts
+    _fundUserAndApprove(1000e6);
+    
+    // Create a policy at exactly 2048 characters
+    bytes memory policy2048 = new bytes(2048);
+    for (uint256 i = 0; i < 2048; i++) {
+      policy2048[i] = bytes1(uint8(65 + (i % 26)));
+    }
+    string memory policy2048Str = string(policy2048);
+    
+    PolicyManager policy2048Manager = new PolicyManager(
+      address(usdc), 
+      address(mtToken), 
+      dev, 
+      policy2048Str
+    );
+    
+    // Grant MINTER_ROLE to the new policy manager
+    vm.prank(admin);
+    mtToken.grantRole(MINTER_ROLE, address(policy2048Manager));
+    
+    // Create replacement that would exceed limit
+    bytes memory excessReplacement = new bytes(_excessLength);
+    for (uint256 i = 0; i < _excessLength; i++) {
+      excessReplacement[i] = bytes1(uint8(88)); // 'X'
+    }
+    string memory excessStr = string(excessReplacement);
+    
+    // ---- Act & Assert
+    vm.expectRevert(PolicyManager.PolicyManager__PolicyTooLong.selector);
+    vm.prank(user);
+    policy2048Manager.editPrompt(2048, 2048, excessStr); // Try to append
   }
 }

@@ -16,6 +16,9 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
   /// @notice Thrown when the replacement length doesn't match the range.
   error PolicyManager__InvalidReplacementLength();
 
+  /// @notice Thrown when the policy string exceeds the maximum allowed length.
+  error PolicyManager__PolicyTooLong();
+
   /// @notice The investment policy stored as ASCII text.
   string public prompt;
 
@@ -39,6 +42,9 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
 
   /// @notice Dev share: 20% in basis points.
   uint256 public constant DEV_BPS = 2000;
+
+  /// @notice Maximum allowed length for policy string.
+  uint256 public constant MAX_POLICY_LENGTH = 2048;
 
   /// @notice Role for minting MT tokens.
   // @note Who is minter?
@@ -75,6 +81,7 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
     if (_usdc == address(0)) revert PolicyManager__InvalidEditRange();
     if (_mtToken == address(0)) revert PolicyManager__InvalidEditRange();
     if (_dev == address(0)) revert PolicyManager__InvalidEditRange();
+    if (bytes(_initialPrompt).length > MAX_POLICY_LENGTH) revert PolicyManager__PolicyTooLong();
 
     USDC = _usdc;
     MT_TOKEN = _mtToken;
@@ -100,6 +107,11 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
 
     // Validate replacement length matches the range
     if (bytes(replacement).length != end - start) revert PolicyManager__InvalidReplacementLength();
+
+    // Calculate final prompt length and validate against limit
+    uint256 currentLength = bytes(prompt).length;
+    uint256 finalLength = currentLength - (end - start) + bytes(replacement).length;
+    if (finalLength > MAX_POLICY_LENGTH) revert PolicyManager__PolicyTooLong();
 
     // Calculate cost units (round up)
     // @note these right?
