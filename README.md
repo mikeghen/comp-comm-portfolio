@@ -8,7 +8,10 @@ This is a template for developers looking to build an assistant that can interac
 ### Preview
 ![Compound Assistant Preview](./preview.png)
 
-## Architecture
+## System Architecture
+![System Architecture](./compcomp_arch.png)
+
+## Code Architecture
 ```mermaid
 flowchart TB
     User(User) --> FrontendApp

@@ -41,7 +41,7 @@ def initialize_agentkit():
     wallet_provider = EthAccountWalletProvider(
         config=EthAccountWalletProviderConfig(
             account=account,
-            chain_id="8453",
+            chain_id=os.environ.get("NETWORK_ID")
         )
     )
     

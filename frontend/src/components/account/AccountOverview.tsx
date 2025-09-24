@@ -5,22 +5,10 @@ import {
   ACCOUNT_ADDRESS,
   ERC20_ABI, 
   getContractsByChainId, 
+  getWalletAssetsByChainId,
   isSupportedChain 
 } from '../../config/contracts';
 import { getTokenPricesWithFallback } from '../../utils/priceService';
-
-// Define the wallet assets including the new compound tokens
-const WALLET_ASSETS = [
-  { symbol: 'USDC', contractKey: 'USDC' as const, decimals: 6 },
-  { symbol: 'WETH', contractKey: 'WETH' as const, decimals: 18 },
-  { symbol: 'cbETH', contractKey: 'cbETH' as const, decimals: 18 },
-  { symbol: 'cbBTC', contractKey: 'cbBTC' as const, decimals: 8 },
-  { symbol: 'WSTETH', contractKey: 'WSTETH' as const, decimals: 18 },
-  { symbol: 'AERO', contractKey: 'AERO' as const, decimals: 18 },
-  { symbol: 'cUSDCv3', contractKey: 'cUSDCv3' as const, decimals: 6 },
-  { symbol: 'cWETHv3', contractKey: 'cWETHv3' as const, decimals: 18 },
-  { symbol: 'cAEROv3', contractKey: 'cAEROv3' as const, decimals: 18 },
-];
 
 function AccountOverview() {
   const { chainId } = useAccount();
@@ -30,8 +18,9 @@ function AccountOverview() {
   // Check if the current chain is supported
   const isSupported = isSupportedChain(chainId);
   
-  // Get contract addresses for wallet assets
+  // Get contract addresses and wallet assets for current chain
   const contracts = getContractsByChainId(chainId);
+  const walletAssets = getWalletAssetsByChainId(chainId);
   
   // State for token prices
   const [tokenPrices, setTokenPrices] = useState<Record<string, number>>({});
@@ -42,7 +31,7 @@ function AccountOverview() {
     const fetchPrices = async () => {
       try {
         setPricesLoading(true);
-        const symbols = WALLET_ASSETS.map(asset => asset.symbol);
+        const symbols = walletAssets.map(asset => asset.symbol);
         const prices = await getTokenPricesWithFallback(symbols);
         setTokenPrices(prices);
       } catch (error) {
@@ -52,17 +41,22 @@ function AccountOverview() {
       }
     };
 
-    // Fetch prices immediately
-    fetchPrices();
+    // Only fetch prices if we have assets for this chain
+    if (walletAssets.length > 0) {
+      // Fetch prices immediately
+      fetchPrices();
 
-    // Set up interval to fetch prices every 2 minutes
-    const priceInterval = setInterval(fetchPrices, 2 * 60 * 1000);
+      // Set up interval to fetch prices every 2 minutes
+      const priceInterval = setInterval(fetchPrices, 2 * 60 * 1000);
 
-    return () => clearInterval(priceInterval);
-  }, []);
+      return () => clearInterval(priceInterval);
+    } else {
+      setPricesLoading(false);
+    }
+  }, [walletAssets]);
   
   // Create hooks for wallet asset balances
-  const walletAssetHooks = WALLET_ASSETS.map(asset => {
+  const walletAssetHooks = walletAssets.map(asset => {
     const contractAddress = contracts?.[asset.contractKey];
     
     return useReadContract({
@@ -75,9 +69,9 @@ function AccountOverview() {
   
   // Calculate total wallet value
   const totalWalletValue = useMemo(() => {
-    if (!contracts) return 0;
+    if (!contracts || walletAssets.length === 0) return 0;
     
-    return WALLET_ASSETS.reduce((total, asset, index) => {
+    return walletAssets.reduce((total, asset, index) => {
       const balanceResult = walletAssetHooks[index];
       if (balanceResult.data === undefined || balanceResult.isError) return total;
       
@@ -87,7 +81,7 @@ function AccountOverview() {
       
       return total + (isNaN(value) ? 0 : value);
     }, 0);
-  }, [contracts, walletAssetHooks, blockNumber, tokenPrices]);
+  }, [contracts, walletAssets, walletAssetHooks, blockNumber, tokenPrices]);
 
   // Track initial load state
   const [hasLoaded, setHasLoaded] = useState(false);
