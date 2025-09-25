@@ -10,6 +10,7 @@ const TOKEN_TO_COINGECKO_ID: Record<string, string> = {
   'USDC': 'usd-coin',
   'WETH': 'ethereum',
   'ETH': 'ethereum', // WETH and ETH have the same price
+  'WBTC': 'bitcoin',
   'cbETH': 'coinbase-wrapped-staked-eth',
   'cbBTC': 'coinbase-wrapped-btc',
   'WSTETH': 'wrapped-steth',

@@ -19,11 +19,10 @@ from coinbase_agentkit import (
 from coinbase_agentkit_langchain import get_langchain_tools
 
 ALLOWED_TOOLS = [
-    "compound_deposit", 
-    "compound_redeem", 
-    "uniswap_v3_swap", 
-    "weth_wrap", 
-    "get_balance" # erc20_action_provider and wallet_action_provider
+    "CompoundActionProvider_deposit",
+    "CompoundActionProvider_redeem", 
+    "ERC20ActionProvider_get_balance",
+    "UniswapV3ActionProvider_swap_exact_input_single"
 ]
 
 def initialize_agentkit():
@@ -66,9 +65,15 @@ def get_tools():
     """
     agentkit, _ = initialize_agentkit()
     all_tools = get_langchain_tools(agentkit)
-
-    # Filter out tools that are not supported by the agent
-    tools = [tool for tool in all_tools if tool.name not in ALLOWED_TOOLS]
+    for tool in all_tools:
+        print("Tool Name:",tool.name)
+    
+    # Only include tools that are in the ALLOWED_TOOLS list
+    tools = [tool for tool in all_tools if tool.name in ALLOWED_TOOLS]
+    
+    print(f"✅ Filtered to {len(tools)} allowed tools out of {len(all_tools)} total tools")
+    for tool in tools:
+        print(f"   - {tool.name}")
 
     try:
         # If available, use LangChain's built-in Python interpreter tool.
