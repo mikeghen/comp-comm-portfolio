@@ -11,6 +11,6 @@ sequenceDiagram
     Holder->>Vault: redeemWETH(mtAmount, to)
     Vault->>Vault: Ensure consolidated & unlocked
     Vault->>MT: burnFrom(holder, mtAmount)
-    Vault->>WETH: transfer(to, pro-rata WETH)
-    Vault-->>Holder: Emit Redeemed event
+    Vault->>Holder: transfer(holder, pro-rata WETH)
+    Vault->>Vault: Emit Redeemed event
 ```
