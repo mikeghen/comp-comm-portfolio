@@ -194,7 +194,7 @@ Pause switches | ManagementToken & VaultManager | Boolean | Use to halt MT trans
     - **REDEMPTION:** Final phase where MT holders can burn tokens to receive proportional WETH.
   - **Pro-rata:** Proportional distribution; MT holders receive WETH proportional to their token holdings during redemption.
   - **Basis Points (BPS):** Unit of measure equal to 0.01%; used for dev share calculations (e.g., 2000 BPS = 20%).
-  - **Dev Wallet:** Immutable address receiving 20% of all MT rewards from message payments and policy edits, either a multisig or Governor Bravo controlled OZ Timelock contracts
+  - **Dev Wallet:** Immutable address receiving 20% of all MT rewards from message payments and policy edits, either a multisig or Governor Bravo controlled OZ Timelock contracts.
 
 
 - **Diagrams:**
