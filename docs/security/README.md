@@ -5,8 +5,7 @@
   2. Policy editors (any address able to pay fees to modify the policy prompt). 
   3. Protocol owner (Ownable2Step owner) and designated agent executing trades and DeFi actions.
   4. Dev wallet receiving revenue share from message payments and policy edits.
-- **How at a high level:** A LangGraph/AgentKit backend brokers signed instructions from users, relays them to the on-chain managers, and the VaultManager coordinates swaps through Uniswap v3 and lending via Compound v3, while AccessControl-guarded roles enforce minting/burning of MT and Ownable2Step gates privileged vault configuration. The audit scope is frozen at tag `audit-freeze-20250924` on commit `1c253fab12be7e19a54697aa3f990a8b527632b9` in this repository.
-
+- **How at a high level:** A LangGraph/AgentKit backend brokers signed instructions from users, relays them to the on-chain managers, and the VaultManager coordinates swaps through Uniswap v3 and lending via Compound v3, while AccessControl-guarded roles enforce minting/burning of MT and Ownable2Step gates privileged vault configuration. The audit scope is frozen at tag `audit-freeze-TBD`.
 ## Architecture Overview
 - **Module map:**
 
@@ -151,7 +150,7 @@ Pause switches | ManagementToken & VaultManager | Boolean | Use to halt MT trans
   # Clone scoped repo at freeze tag
   git clone https://github.com/<org>/comp-comm-portfolio.git
   cd comp-comm-portfolio
-  git checkout audit-freeze-20250924
+  git checkout audit-freeze-TBD
   ```
 - **Environment variables:**
   - Copy `backend/.env.example` to configure backend if needed for integration testing the assistant UI.
