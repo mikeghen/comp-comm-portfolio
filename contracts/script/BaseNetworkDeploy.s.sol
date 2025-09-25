@@ -27,4 +27,8 @@ contract BaseNetworkDeploy is DeployBaseImpl {
     // Inherit env-driven actor configuration
     super.setup();
   }
+
+  function run() public override {
+    super.run();
+  }
 }
