@@ -106,7 +106,8 @@ contract DeployAndVerifyIntegration is Test {
     address user = makeAddr("User");
     // Give message manager and policy manager spending power via minting USDC to user
     uint256 editUnits = 2; // 20 chars
-    uint256 totalCost = editUnits * policy.EDIT_PRICE_PER_10_CHARS_USDC() + msgMgr.MESSAGE_PRICE_USDC();
+    uint256 totalCost =
+      editUnits * policy.EDIT_PRICE_PER_10_CHARS_USDC() + msgMgr.MESSAGE_PRICE_USDC();
     deal(USDC, user, totalCost);
 
     // Approvals
@@ -122,7 +123,8 @@ contract DeployAndVerifyIntegration is Test {
     assertEq(mt.balanceOf(dev), expectedDevMint);
 
     // ---- Act: pay for message via signature to mint more MT
-    (bytes32 digest, uint256 msgUserMint, uint256 msgDevMint, address payer) = _payMessageAndExpected(0xFACEFEED);
+    (bytes32 digest, uint256 msgUserMint, uint256 msgDevMint, address payer) =
+      _payMessageAndExpected(0xFACEFEED);
     // ---- Assert: further MT minted to payer and dev
     assertEq(mt.balanceOf(payer), msgUserMint);
     assertEq(mt.balanceOf(dev), expectedDevMint + msgDevMint);
@@ -147,10 +149,7 @@ contract DeployAndVerifyIntegration is Test {
     assertEq(IERC20(WETH).balanceOf(user), expectedWethOut);
   }
 
-  function _trySwapUSDCtoWETH(uint256 amountIn)
-    internal
-    returns (uint256 amountOut)
-  {
+  function _trySwapUSDCtoWETH(uint256 amountIn) internal returns (uint256 amountOut) {
     // Try common v3 fee tiers
     uint24[3] memory FEES = [uint24(500), uint24(3000), uint24(10_000)];
     for (uint256 i = 0; i < FEES.length; i++) {
@@ -174,7 +173,7 @@ contract DeployAndVerifyIntegration is Test {
 
   function test_AgentAbilities_UniswapAndCompound() public {
     // ---- Arrange: fund vault with USDC
-    uint256 usdcAmt = 2_000e6;
+    uint256 usdcAmt = 2000e6;
     deal(USDC, address(vault), usdcAmt);
 
     // Allowlist already set by deploy script
@@ -225,14 +224,10 @@ contract DeployAndVerifyIntegration is Test {
     vm.prank(payer);
     IERC20(USDC).approve(address(msgMgr), type(uint256).max);
 
-    MessageManager.Message memory m = MessageManager.Message({
-      messageHash: keccak256("hello"),
-      payer: payer,
-      nonce: 1
-    });
-    bytes32 structHash = keccak256(
-      abi.encode(msgMgr.MESSAGE_TYPEHASH(), m.messageHash, m.payer, m.nonce)
-    );
+    MessageManager.Message memory m =
+      MessageManager.Message({messageHash: keccak256("hello"), payer: payer, nonce: 1});
+    bytes32 structHash =
+      keccak256(abi.encode(msgMgr.MESSAGE_TYPEHASH(), m.messageHash, m.payer, m.nonce));
     digest = keccak256(abi.encodePacked("\x19\x01", msgMgr.exposed_DOMAIN_SEPARATOR(), structHash));
     (uint8 v, bytes32 r, bytes32 s) = vm.sign(payerPk, digest);
     bytes memory sig = abi.encodePacked(r, s, v);
@@ -255,5 +250,3 @@ contract DeployAndVerifyIntegration is Test {
     vault.redeemWETH(redeemAmt, user);
   }
 }
-
-

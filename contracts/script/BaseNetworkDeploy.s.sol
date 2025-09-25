@@ -28,5 +28,3 @@ contract BaseNetworkDeploy is DeployBaseImpl {
     super.setup();
   }
 }
-
-

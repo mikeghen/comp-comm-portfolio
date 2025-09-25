@@ -21,7 +21,7 @@ contract DeployBaseImpl is Script {
   // ---- Configurable actors ----
   address public admin; // DEFAULT_ADMIN for access control and final vault owner
   address public agent; // operational agent role for MessageManager and VaultManager
-  address public dev;   // dev revenue recipient for PolicyManager and MessageManager
+  address public dev; // dev revenue recipient for PolicyManager and MessageManager
 
   // ---- Network addresses ----
   address public USDC;
@@ -38,7 +38,7 @@ contract DeployBaseImpl is Script {
 
   // ---- Keys (optional when running in tests) ----
   uint256 public deployerPrivateKey; // used for deployments and initial configuration
-  uint256 public adminPrivateKey;    // used to accept vault ownership (Ownable2Step)
+  uint256 public adminPrivateKey; // used to accept vault ownership (Ownable2Step)
 
   /// @notice Initialize config from environment. Network addresses must be set by child.
   function setup() public virtual {
@@ -115,20 +115,13 @@ contract DeployBaseImpl is Script {
     // ---- Deploy vault manager ----
     console.log("Deploying VaultManager...");
     vaultManager = new VaultManager(
-      USDC,
-      WETH,
-      address(managementToken),
-      UNISWAP_V3_ROUTER,
-      COMET_REWARDS,
-      agent
+      USDC, WETH, address(managementToken), UNISWAP_V3_ROUTER, COMET_REWARDS, agent
     );
     console.log("VaultManager:", address(vaultManager));
 
     // ---- Configure vault allowlists and comets ----
     // Allow a basic set used in integration tests; these no-ops if zero.
-    if (AERO != address(0)) {
-      vaultManager.setAllowedAsset(AERO, true);
-    }
+    if (AERO != address(0)) vaultManager.setAllowedAsset(AERO, true);
     vaultManager.setAllowedAsset(USDC, true);
     vaultManager.setAllowedAsset(WETH, true);
 
@@ -138,7 +131,9 @@ contract DeployBaseImpl is Script {
 
     if (COMET_USDC != address(0)) vaultManager.setAssetComet(USDC, COMET_USDC);
     if (COMET_WETH != address(0)) vaultManager.setAssetComet(WETH, COMET_WETH);
-    if (AERO != address(0) && COMET_AERO != address(0)) vaultManager.setAssetComet(AERO, COMET_AERO);
+    if (AERO != address(0) && COMET_AERO != address(0)) {
+      vaultManager.setAssetComet(AERO, COMET_AERO);
+    }
 
     // ---- Transfer ownership of vault to admin (Ownable2Step) ----
     vaultManager.transferOwnership(admin);
@@ -194,5 +189,3 @@ contract DeployBaseImpl is Script {
     console.log("==========================\n");
   }
 }
-
-
