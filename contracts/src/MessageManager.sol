@@ -101,7 +101,7 @@ contract MessageManager is AccessControl, ReentrancyGuard, EIP712 {
         address _mtToken,
         address _dev,
         address _agent,
-        address _admin
+        address _admin,
         address _vault
     ) EIP712("MessageManager", "1") {
         if (

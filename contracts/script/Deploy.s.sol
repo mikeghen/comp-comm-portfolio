@@ -23,7 +23,8 @@ contract Deploy is Script {
 
   /// @notice USDC token address (from environment)
   address public usdc;
-
+  /// @notice Vault address (from environment)
+  address public vault;
   /// @notice Initial investment policy prompt (from environment)
   string public initialPrompt;
 
@@ -46,7 +47,7 @@ contract Deploy is Script {
 
     // Deploy PolicyManager
     console.log("Deploying PolicyManager...");
-    policyManager = new PolicyManager(usdc, address(managementToken), dev, initialPrompt);
+    policyManager = new PolicyManager(usdc, address(managementToken), dev, vault,initialPrompt);
     console.log("PolicyManager deployed at:", address(policyManager));
 
     // Grant MINTER_ROLE to PolicyManager so it can mint tokens
@@ -67,6 +68,7 @@ contract Deploy is Script {
     admin = vm.envAddress("ADMIN_ADDRESS");
     dev = vm.envAddress("DEV_ADDRESS");
     usdc = vm.envAddress("USDC_ADDRESS");
+    vault = vm.envAddress("VAULT_ADDRESS");
 
     // Required configuration
     initialPrompt = vm.envString("INITIAL_PROMPT");

@@ -18,7 +18,7 @@ contract MessageManagerTest is Test {
   address dev;
   address payer;
   address relayer;
-
+  address vault;
   // Role constants
   bytes32 constant MINTER_ROLE = keccak256("MINTER_ROLE");
   bytes32 constant AGENT_ROLE = keccak256("AGENT_ROLE");
@@ -29,6 +29,7 @@ contract MessageManagerTest is Test {
     dev = makeAddr("Dev");
     payer = makeAddr("Payer");
     relayer = makeAddr("Relayer");
+    vault = makeAddr("Vault");
 
     vm.label(admin, "Admin");
     vm.label(agent, "Agent");
@@ -45,7 +46,7 @@ contract MessageManagerTest is Test {
     vm.label(address(mtToken), "MT Token");
 
     // Deploy SUT
-    messageManager = new MessageManager(address(usdc), address(mtToken), dev, agent, admin);
+    messageManager = new MessageManager(address(usdc), address(mtToken), dev, agent, admin,vault);
     vm.label(address(messageManager), "MessageManager");
 
     // Grant mint role to SUT
@@ -108,27 +109,27 @@ contract Constructor is MessageManagerTest {
 
   function test_RevertIf_UsdcZeroAddress() public {
     vm.expectRevert(MessageManager.MessageManager__InvalidAddress.selector);
-    new MessageManager(address(0), address(mtToken), dev, agent, admin);
+    new MessageManager(address(0), address(mtToken), dev, agent, admin,vault);
   }
 
   function test_RevertIf_MtTokenZeroAddress() public {
     vm.expectRevert(MessageManager.MessageManager__InvalidAddress.selector);
-    new MessageManager(address(usdc), address(0), dev, agent, admin);
+    new MessageManager(address(usdc), address(0), dev, agent, admin,vault);
   }
 
   function test_RevertIf_DevZeroAddress() public {
     vm.expectRevert(MessageManager.MessageManager__InvalidAddress.selector);
-    new MessageManager(address(usdc), address(mtToken), address(0), agent, admin);
+    new MessageManager(address(usdc), address(mtToken), address(0), agent, admin,vault);
   }
 
   function test_RevertIf_AgentZeroAddress() public {
     vm.expectRevert(MessageManager.MessageManager__InvalidAddress.selector);
-    new MessageManager(address(usdc), address(mtToken), dev, address(0), admin);
+    new MessageManager(address(usdc), address(mtToken), dev, address(0), admin,vault);
   }
 
   function test_RevertIf_AdminZeroAddress() public {
     vm.expectRevert(MessageManager.MessageManager__InvalidAddress.selector);
-    new MessageManager(address(usdc), address(mtToken), dev, agent, address(0));
+    new MessageManager(address(usdc), address(mtToken), dev, agent, address(0),vault);
   }
 }
 
@@ -159,7 +160,7 @@ contract PayForMessageWithSig is MessageManagerTest {
 
     // ---- Assert
     assertTrue(messageManager.paidMessages(digest));
-    assertEq(usdc.balanceOf(address(messageManager)), price);
+    assertEq(usdc.balanceOf(address(vault)), price);
     assertEq(mtToken.balanceOf(_payer), userMint);
     assertEq(mtToken.balanceOf(dev), devMint);
   }
@@ -182,7 +183,7 @@ contract PayForMessageWithSig is MessageManagerTest {
 
     // ---- Assert
     assertTrue(messageManager.paidMessages(digest));
-    assertEq(usdc.balanceOf(address(messageManager)), price);
+    assertEq(usdc.balanceOf(address(vault)), price);
   }
 
   function test_RevertIf_InvalidSignature() public {

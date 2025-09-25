@@ -78,12 +78,13 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
         address _usdc,
         address _mtToken,
         address _dev,
+        address _vault,
         string memory _initialPrompt
     ) {
         if (_usdc == address(0)) revert PolicyManager__InvalidEditRange();
         if (_mtToken == address(0)) revert PolicyManager__InvalidEditRange();
         if (_dev == address(0)) revert PolicyManager__InvalidEditRange();
-
+        VAULT = _vault;
         USDC = _usdc;
         MT_TOKEN = _mtToken;
         DEV = _dev;
@@ -240,6 +241,7 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
             }
         }
     }
+
     function concat(
         bytes memory a,
         bytes memory b
@@ -282,6 +284,7 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
             mstore(0x40, add(last, 0x20)) // Allocate memory.
         }
     }
+
     /// @notice Internal function to apply the edit to the prompt.
     /// @param start The start index of the edit.
     /// @param end The end index of the edit.
@@ -289,20 +292,18 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
     function _applyEdit(
         uint256 start,
         uint256 end,
-        string calldata replacement,
-        string calldata prompt
-    ) external view returns (string memory) {
+        string calldata replacement
+    ) internal  returns (string memory) {
         bytes memory promptBytes = bytes(prompt);
-        bytes memory replacementBytes = bytes(replacement);
 
         // Copy the part before the edit
         bytes memory p1 = slice(bytes(prompt), 0, start);
         // Copy the part after the edit
-        bytes memory p2 = slice(bytes(prompt), end, promptBytes.length - 1);
+        bytes memory p2 = slice(bytes(prompt), end, promptBytes.length);
         // Concatenate the edit to the fist part
         bytes memory temp = concat(p1, bytes(replacement));
         // string(concat(concat(slice(bytes(prompt), 0, start), bytes(replacement)), p2));
 
-        return string(concat(temp, p2));
+        prompt = string(concat(temp, p2));
     }
 }
