@@ -202,3 +202,170 @@ Pause switches | ManagementToken & VaultManager | Boolean | Use to halt MT trans
   - [Policy edit](./diagrams/edit-policy.md)
   - [Vault investment lifecycle](./diagrams/vault-investment.md)
   - [MT redemption](./diagrams/redeem-weth.md)
+
+- **Test matrix:** Generated with `scopelint spec`, last run `2025-09-25`:
+```
+Contract Specification: ManagementToken
+├── constructor
+│   ├──  Sets Correct Name And Symbol
+│   ├──  Sets Correct Decimals
+│   ├──  Sets Admin Role
+│   ├──  Initial Supply Is Zero
+│   ├──  Grants Default Admin Role To Admin
+│   ├──  Sets Admin To Arbitrary Address
+│   └──  Revert If: Admin Is Zero Address
+├── mint
+│   ├──  Mints Tokens To Address
+│   ├──  Emits Tokens Minted Event
+│   ├──  Emits Transfer Event
+│   ├──  Revert If: Caller Does Not Have Minter Role
+│   ├──  Revert If: To Address Is Zero
+│   └──  Admin Can Grant Minter Role And Mint
+├── burnFrom
+│   ├──  Burns Tokens From Account With Sufficient Balance
+│   ├──  Emits Tokens Burned Event
+│   ├──  Emits Transfer Event
+│   ├──  Burns From Account With Approval
+│   ├──  Burns From Self Without Approval
+│   ├──  Revert If: Caller Does Not Have Burner Role
+│   ├──  Revert If: Account Is Zero Address
+│   ├──  Revert If: Insufficient Balance
+│   └──  Revert If: Insufficient Allowance
+├── pause
+│   ├──  Pauses Token
+│   ├──  Emits Transfers Paused Event
+│   ├──  Emits Paused Event
+│   ├──  Revert If: Caller Does Not Have Pauser Role
+│   └──  Admin Can Grant Pauser Role And Pause
+├── unpause
+│   ├──  Unpauses Token
+│   ├──  Emits Transfers Unpaused Event
+│   ├──  Emits Unpaused Event
+│   ├──  Revert If: Caller Does Not Have Pauser Role
+│   └──  Admin Can Grant Pauser Role And Unpause
+└── _update
+
+Contract Specification: PolicyManager
+├── constructor
+│   ├──  Sets Configuration Parameters
+│   ├──  Sets Configuration Parameters To Arbitrary Values
+│   ├──  Revert If: Usdc Address Is Zero
+│   ├──  Revert If: Mt Token Address Is Zero
+│   └──  Revert If: Dev Address Is Zero
+├── editPrompt
+│   ├──  Edits Prompt With Valid Range
+│   ├──  Emits Prompt Edited Event
+│   ├──  Revert If: Invalid Edit Range
+│   ├──  Revert If: Invalid Replacement Length
+│   ├──  Revert If: Insufficient U S D C Balance
+│   ├──  Applies Edit Correctly
+│   ├──  Edits Prompt With Zero Range Length
+│   └──  Edits Prompt With Exact Cost Calculation
+├── getPrompt
+│   ├──  Returns Current Prompt And Version
+│   └──  Returns Updated Prompt After Edit
+├── getPromptSlice
+│   ├──  Returns Correct Slice
+│   ├──  Returns Empty Slice For Zero Range
+│   ├──  Returns Full Prompt Slice
+│   └──  Revert If: Invalid Slice Range
+├── previewEditCost
+│   ├──  Calculates Correct Costs
+│   ├──  Calculates Costs For Specific Values
+│   └──  Calculates Costs For Multiple Units
+├── _mintMT
+└── _applyEdit
+
+Contract Specification: MessageManager
+├── constructor
+│   ├──  Sets Configuration Parameters
+│   ├──  Grants Roles
+│   ├──  Revert If: Usdc Zero Address
+│   ├──  Revert If: Mt Token Zero Address
+│   ├──  Revert If: Dev Zero Address
+│   ├──  Revert If: Agent Zero Address
+│   └──  Revert If: Admin Zero Address
+├── payForMessageWithSig
+│   ├──  Pays With Valid Signature: From Payer Directly
+│   ├──  Pays With Valid Signature: Via Relayer
+│   ├──  Revert If: Invalid Signature
+│   ├──  Revert If: Replayed Same Digest With Different Signature Encodings
+│   ├──  Revert If: Tampered Message After Signing
+│   └──  Allows New Signature With Different Nonce
+├── markMessageProcessed
+│   ├──  Marks Processed When Paid
+│   ├──  Revert If: Called By Non Agent
+│   ├──  Revert If: Not Paid
+│   └──  Revert If: Already Processed
+└── exposed_DOMAIN_SEPARATOR
+
+Contract Specification: VaultManager
+├── onlyAgentOrOwner
+├── constructor
+│   ├──  Sets Configuration Parameters
+│   ├──  Revert If: Zero Address: U S D C
+│   ├──  Revert If: Zero Address: W E T H
+│   ├──  Revert If: Zero Address: Router
+│   └──  Revert If: Zero Address: Comet Rewards
+├── exactInputSingle
+├── supply
+│   ├──  Revert If: Amount Zero
+│   ├──  Revert If: Comet Not Allowed Or Unset
+│   ├──  Deposits Asset To Comet
+│   ├──  Emits Comet Supplied Event
+│   ├──  Revert If: Asset Not Allowed
+│   ├──  Revert If: Caller Not Agent Or Owner
+│   └──  Agent Can Supply
+├── _approveIfNeeded
+├── withdraw
+│   ├──  Revert If: Amount Zero
+│   ├──  Revert If: Comet Not Allowed Or Unset
+│   ├──  Revert If: Asset Not Allowed
+│   ├──  Withdraws Asset From Comet
+│   ├──  Emits Comet Withdrawn Event
+│   ├──  Agent Can Withdraw
+│   └──  Revert If: Caller Not Agent Or Owner: Withdraw
+├── claimComp
+│   ├──  Revert If: Invalid To Address
+│   ├──  Claims Rewards
+│   ├──  Emits Comp Claimed Event
+│   ├──  Revert If: Comet Not Allowed
+│   ├──  Agent Can Claim Rewards
+│   └──  Revert If: Caller Not Agent Or Owner: Claim Comp
+├── getCurrentPhase
+│   ├──  Returns Locked Before Unlock
+│   ├──  Returns Consolidation Post Unlock With Non Weth Balance
+│   ├──  Returns Redemption Post Unlock When Consolidated
+│   └──  Returns Consolidation Post Unlock With Open Comet Position
+├── isConsolidated
+├── _isConsolidatedInternal
+├── redeemWETH
+│   ├──  Revert If: Amount Zero
+│   ├──  Revert If: Invalid To Address
+│   ├──  Redeems Pro Rata W E T H In Redemption Phase
+│   ├──  Emits Redeemed Event
+│   └──  Revert If: Not In Redemption Phase
+├── setAllowedAsset
+│   ├──  Revert If: Token Zero Address
+│   ├──  Sets Allowed Asset
+│   └──  Emits Allowed Asset Set Event
+├── setAllowedComet
+│   ├──  Revert If: Comet Zero Address
+│   ├──  Sets Allowed Comet
+│   └──  Emits Allowed Comet Set Event
+├── setAssetComet
+│   ├──  Revert If: Asset Not Allow Listed
+│   ├──  Revert If: Comet Not Allow Listed
+│   ├──  Sets Asset Comet
+│   ├──  Revert If: Asset Is Zero
+│   ├──  Revert If: Comet Is Zero
+│   └──  Emits Asset Comet Set Event
+├── setAgent
+│   ├──  Revert If: New Agent Zero
+│   ├──  Updates Agent Role
+│   └──  Emits Agent Set Event
+├── pause
+│   ├──  Pauses And Blocks Swap
+│   └──  Unpauses And Allows Swap
+└── unpause
+```
