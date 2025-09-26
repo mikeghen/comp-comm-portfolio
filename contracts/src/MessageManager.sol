@@ -11,7 +11,7 @@ import {ManagementToken} from "./ManagementToken.sol";
 
 /// @title MessageManager
 /// @notice Handles USDC payments for AI agent messages and MT minting with replay protection.
-/// @dev Uses AccessControl for agent permissions and EIP-712 for auth.
+///@dev Uses AccessControl for agent permissions and EIP-712 for auth .
 contract MessageManager is AccessControl, ReentrancyGuard, EIP712 {
   /// @notice Thrown when a message has already been paid.
   error MessageManager__AlreadyPaid();
@@ -49,6 +49,9 @@ contract MessageManager is AccessControl, ReentrancyGuard, EIP712 {
 
   /// @notice MT token address.
   address public immutable MT_TOKEN;
+
+  /// @notice Vault Address
+  address public immutable VAULT;
 
   /// @notice Dev share receiver.
   address public immutable DEV;
@@ -93,18 +96,23 @@ contract MessageManager is AccessControl, ReentrancyGuard, EIP712 {
   /// @param _dev Dev share receiver address.
   /// @param _agent Agent address to be granted AGENT_ROLE.
   /// @param _admin Admin address for AccessControl DEFAULT_ADMIN_ROLE.
-  constructor(address _usdc, address _mtToken, address _dev, address _agent, address _admin)
-    EIP712("MessageManager", "1")
-  {
+  constructor(
+    address _usdc,
+    address _mtToken,
+    address _dev,
+    address _agent,
+    address _admin,
+    address _vault
+  ) EIP712("MessageManager", "1") {
     if (
       _usdc == address(0) || _mtToken == address(0) || _dev == address(0) || _agent == address(0)
-        || _admin == address(0)
+        || _admin == address(0) || _vault == address(0)
     ) revert MessageManager__InvalidAddress();
 
     USDC = _usdc;
     MT_TOKEN = _mtToken;
     DEV = _dev;
-
+    VAULT = _vault;
     _grantRole(DEFAULT_ADMIN_ROLE, _admin);
     _grantRole(AGENT_ROLE, _agent);
   }
@@ -132,7 +140,7 @@ contract MessageManager is AccessControl, ReentrancyGuard, EIP712 {
     paidMessages[digest] = true;
 
     // Transfer fixed USDC price from payer to this contract
-    IERC20(USDC).transferFrom(m.payer, address(this), MESSAGE_PRICE_USDC);
+    IERC20(USDC).transferFrom(m.payer, VAULT, MESSAGE_PRICE_USDC);
 
     // Compute mint amounts
     uint256 userMint = MT_PER_MESSAGE_USER;

@@ -13,6 +13,7 @@ contract PolicyManagerTest is Test {
   MockERC20 usdc;
   address admin;
   address dev;
+  address vault;
   string initialPrompt;
 
   // Role constants
@@ -21,6 +22,7 @@ contract PolicyManagerTest is Test {
   function setUp() public virtual {
     admin = makeAddr("Admin");
     dev = makeAddr("Dev");
+    vault = makeAddr("Vault");
     initialPrompt = "Initial investment policy: Invest in blue chip stocks and bonds.";
 
     // Deploy mock USDC
@@ -33,7 +35,7 @@ contract PolicyManagerTest is Test {
     vm.label(address(mtToken), "MT Token");
 
     // Deploy PolicyManager
-    policyManager = new PolicyManager(address(usdc), address(mtToken), dev, initialPrompt);
+    policyManager = new PolicyManager(address(usdc), address(mtToken), dev, vault, initialPrompt);
     vm.label(address(policyManager), "PolicyManager");
 
     // Grant MINTER_ROLE to PolicyManager so it can mint MT tokens
@@ -77,13 +79,15 @@ contract Constructor is PolicyManagerTest {
     address _usdc,
     address _mtToken,
     address _dev,
+    address _vault,
     string memory _initialPrompt
   ) public {
     _assumeSafeAddress(_usdc);
     _assumeSafeAddress(_mtToken);
     _assumeSafeAddress(_dev);
+    _assumeSafeAddress(_vault);
 
-    PolicyManager _policyManager = new PolicyManager(_usdc, _mtToken, _dev, _initialPrompt);
+    PolicyManager _policyManager = new PolicyManager(_usdc, _mtToken, _dev, vault, _initialPrompt);
 
     assertEq(_policyManager.USDC(), _usdc);
     assertEq(_policyManager.MT_TOKEN(), _mtToken);
@@ -95,37 +99,40 @@ contract Constructor is PolicyManagerTest {
   function testFuzz_RevertIf_UsdcAddressIsZero(
     address _mtToken,
     address _dev,
+    address vault,
     string memory _initialPrompt
   ) public {
     _assumeSafeAddress(_mtToken);
     _assumeSafeAddress(_dev);
 
     vm.expectRevert(PolicyManager.PolicyManager__InvalidEditRange.selector);
-    new PolicyManager(address(0), _mtToken, _dev, _initialPrompt);
+    new PolicyManager(address(0), _mtToken, _dev, vault, _initialPrompt);
   }
 
   function testFuzz_RevertIf_MtTokenAddressIsZero(
     address _usdc,
     address _dev,
+    address vault,
     string memory _initialPrompt
   ) public {
     _assumeSafeAddress(_usdc);
     _assumeSafeAddress(_dev);
 
     vm.expectRevert(PolicyManager.PolicyManager__InvalidEditRange.selector);
-    new PolicyManager(_usdc, address(0), _dev, _initialPrompt);
+    new PolicyManager(_usdc, address(0), _dev, vault, _initialPrompt);
   }
 
   function testFuzz_RevertIf_DevAddressIsZero(
     address _usdc,
     address _mtToken,
+    address vault,
     string memory _initialPrompt
   ) public {
     _assumeSafeAddress(_usdc);
     _assumeSafeAddress(_mtToken);
 
     vm.expectRevert(PolicyManager.PolicyManager__InvalidEditRange.selector);
-    new PolicyManager(_usdc, _mtToken, address(0), _initialPrompt);
+    new PolicyManager(_usdc, _mtToken, address(0), vault, _initialPrompt);
   }
 }
 

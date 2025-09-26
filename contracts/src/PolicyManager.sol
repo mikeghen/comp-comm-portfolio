@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {LibBytes} from "@solady-utils/LibBytes.sol";
 import {AccessControl} from "openzeppelin/access/AccessControl.sol";
 import {ReentrancyGuard} from "openzeppelin/utils/ReentrancyGuard.sol";
 import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
@@ -27,6 +28,9 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
 
   /// @notice MT token address.
   address public immutable MT_TOKEN;
+
+  /// @notice Vault Address
+  address public immutable VAULT;
 
   /// @notice Dev share receiver address.
   address public immutable DEV;
@@ -71,11 +75,17 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
   /// @param _mtToken The MT token address.
   /// @param _dev The dev share receiver address.
   /// @param _initialPrompt The initial investment policy text.
-  constructor(address _usdc, address _mtToken, address _dev, string memory _initialPrompt) {
+  constructor(
+    address _usdc,
+    address _mtToken,
+    address _dev,
+    address _vault,
+    string memory _initialPrompt
+  ) {
     if (_usdc == address(0)) revert PolicyManager__InvalidEditRange();
     if (_mtToken == address(0)) revert PolicyManager__InvalidEditRange();
     if (_dev == address(0)) revert PolicyManager__InvalidEditRange();
-
+    VAULT = _vault;
     USDC = _usdc;
     MT_TOKEN = _mtToken;
     DEV = _dev;
@@ -112,7 +122,7 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
     uint256 devMint = (userMint * DEV_BPS) / 10_000;
 
     // Transfer USDC from user
-    IERC20(USDC).transferFrom(msg.sender, address(this), costUSDC);
+    IERC20(USDC).transferFrom(msg.sender, VAULT, costUSDC);
 
     // Mint MT tokens to user and dev
     _mintMT(msg.sender, userMint);
@@ -181,28 +191,19 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
   /// @param start The start index of the edit.
   /// @param end The end index of the edit.
   /// @param replacement The replacement text.
-  function _applyEdit(uint256 start, uint256 end, string calldata replacement) internal {
+  function _applyEdit(uint256 start, uint256 end, string calldata replacement)
+    internal
+    returns (string memory)
+  {
     bytes memory promptBytes = bytes(prompt);
-    bytes memory replacementBytes = bytes(replacement);
-
-    // Create new bytes array for the result
-    bytes memory newPrompt = new bytes(promptBytes.length - (end - start) + replacementBytes.length);
-
     // Copy the part before the edit
-    for (uint256 i = 0; i < start; i++) {
-      newPrompt[i] = promptBytes[i];
-    }
-
-    // Copy the replacement
-    for (uint256 i = 0; i < replacementBytes.length; i++) {
-      newPrompt[start + i] = replacementBytes[i];
-    }
-
+    bytes memory p1 = LibBytes.slice(bytes(prompt), 0, start);
     // Copy the part after the edit
-    for (uint256 i = end; i < promptBytes.length; i++) {
-      newPrompt[start + replacementBytes.length + (i - end)] = promptBytes[i];
-    }
+    bytes memory p2 = LibBytes.slice(bytes(prompt), end, promptBytes.length);
+    // Concatenate the edit to the fist part
+    bytes memory temp = LibBytes.concat(p1, bytes(replacement));
+    // string(concat(concat(slice(bytes(prompt), 0, start), bytes(replacement)), p2));
 
-    prompt = string(newPrompt);
+    prompt = string(LibBytes.concat(temp, p2));
   }
 }

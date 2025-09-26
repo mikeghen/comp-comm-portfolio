@@ -98,23 +98,6 @@ contract DeployBaseImpl is Script {
     managementToken = new ManagementToken(admin);
     console.log("ManagementToken:", address(managementToken));
 
-    // ---- Deploy policy manager ----
-    console.log("Deploying PolicyManager...");
-    policyManager = new PolicyManager(USDC, address(managementToken), dev, initialPrompt);
-    console.log("PolicyManager:", address(policyManager));
-
-    // Grant admin in PolicyManager to configured admin, revoke deployer if different
-    policyManager.grantRole(policyManager.DEFAULT_ADMIN_ROLE(), admin);
-    if (admin != msg.sender) {
-      // When broadcasting, msg.sender is the EOA deployer
-      try policyManager.revokeRole(policyManager.DEFAULT_ADMIN_ROLE(), msg.sender) {} catch {}
-    }
-
-    // ---- Deploy message manager ----
-    console.log("Deploying MessageManager...");
-    messageManager = new MessageManager(USDC, address(managementToken), dev, agent, admin);
-    console.log("MessageManager:", address(messageManager));
-
     // ---- Deploy vault manager ----
     console.log("Deploying VaultManager...");
     vaultManager = new VaultManager(
@@ -158,6 +141,25 @@ contract DeployBaseImpl is Script {
 
     // ---- Transfer ownership of vault to admin (Ownable2Step) ----
     vaultManager.transferOwnership(admin);
+
+    // ---- Deploy message manager ----
+    console.log("Deploying MessageManager...");
+    messageManager =
+      new MessageManager(USDC, address(managementToken), dev, agent, admin, address(vaultManager));
+    console.log("MessageManager:", address(messageManager));
+
+    // ---- Deploy policy manager ----
+    console.log("Deploying PolicyManager...");
+    policyManager =
+      new PolicyManager(USDC, address(managementToken), dev, address(vaultManager), initialPrompt);
+    console.log("PolicyManager:", address(policyManager));
+
+    // Grant admin in PolicyManager to configured admin, revoke deployer if different
+    policyManager.grantRole(policyManager.DEFAULT_ADMIN_ROLE(), admin);
+    if (admin != msg.sender) {
+      // When broadcasting, msg.sender is the EOA deployer
+      try policyManager.revokeRole(policyManager.DEFAULT_ADMIN_ROLE(), msg.sender) {} catch {}
+    }
 
     if (useBroadcast) vm.stopBroadcast();
 
