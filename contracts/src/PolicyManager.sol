@@ -189,7 +189,7 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
   // taken from https://github.com/Vectorized/solady/blob/main/src/utils/LibBytes.sol
   /// @dev Returns a copy of `subject` sliced from `start` to `end` (exclusive).
   /// `start` and `end` are byte offsets.
-  function slice(bytes memory subject, uint256 start, uint256 end)
+  function _slice(bytes memory subject, uint256 start, uint256 end)
     internal
     pure
     returns (bytes memory result)
@@ -221,7 +221,7 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
   // taken from https://github.com/Vectorized/solady/blob/main/src/utils/LibBytes.sol
   /// @dev Returns a concatenated bytes of `a` and `b`.
   /// Cheaper than `bytes.concat()` and does not de-align the free memory pointer.
-  function concat(bytes memory a, bytes memory b) internal pure returns (bytes memory result) {
+  function _concat(bytes memory a, bytes memory b) internal pure returns (bytes memory result) {
     /// @solidity memory-safe-assembly
     assembly {
       result := mload(0x40)
@@ -260,13 +260,13 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
     bytes memory promptBytes = bytes(prompt);
 
     // Copy the part before the edit
-    bytes memory p1 = slice(bytes(prompt), 0, start);
+    bytes memory p1 = _slice(bytes(prompt), 0, start);
     // Copy the part after the edit
-    bytes memory p2 = slice(bytes(prompt), end, promptBytes.length);
+    bytes memory p2 = _slice(bytes(prompt), end, promptBytes.length);
     // Concatenate the edit to the fist part
-    bytes memory temp = concat(p1, bytes(replacement));
+    bytes memory temp = _concat(p1, bytes(replacement));
     // string(concat(concat(slice(bytes(prompt), 0, start), bytes(replacement)), p2));
 
-    prompt = string(concat(temp, p2));
+    prompt = string(_concat(temp, p2));
   }
 }
