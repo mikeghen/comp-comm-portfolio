@@ -1,31 +1,59 @@
-import React from 'react';
+import React, { RefObject } from 'react';
 import { Card } from 'react-bootstrap';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 
-function ChatContainer({ 
-  isConnected, 
-  messages, 
-  messagesEndRef, 
+type ConnectionStatus = 'connected' | 'connecting' | 'disconnected';
+
+interface Message {
+  type: 'agent' | 'user' | 'thinking' | 'tool' | 'tool_call' | 'error' | 'signature_pending';
+  content: string;
+}
+
+interface ChatContainerProps {
+  isConnected: boolean;
+  messages: Message[];
+  messagesEndRef: RefObject<HTMLDivElement>;
+  input: string;
+  setInput: (value: string) => void;
+  handleKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => Promise<void>;
+  onPrimaryAction: () => Promise<void>;
+  connectionStatus: ConnectionStatus;
+  isThinking: boolean;
+  buttonLabel: string;
+  isButtonDisabled: boolean;
+  isProcessingAction: boolean;
+}
+
+const ChatContainer: React.FC<ChatContainerProps> = ({
+  isConnected,
+  messages,
+  messagesEndRef,
   input,
   setInput,
   handleKeyDown,
-  sendMessage,
+  onPrimaryAction,
   connectionStatus,
-  isThinking
-}) {
+  isThinking,
+  buttonLabel,
+  isButtonDisabled,
+  isProcessingAction
+}) => {
   return (
     <Card className="h-100 chat-card">
       {isConnected ? (
         <>
           <MessageList messages={messages} messagesEndRef={messagesEndRef} />
-          <MessageInput 
+          <MessageInput
             input={input}
             setInput={setInput}
             handleKeyDown={handleKeyDown}
-            sendMessage={sendMessage}
+            onPrimaryAction={onPrimaryAction}
             connectionStatus={connectionStatus}
             isThinking={isThinking}
+            buttonLabel={buttonLabel}
+            isButtonDisabled={isButtonDisabled}
+            isProcessingAction={isProcessingAction}
           />
         </>
       ) : (
@@ -36,6 +64,6 @@ function ChatContainer({
       )}
     </Card>
   );
-}
+};
 
-export default ChatContainer; 
+export default ChatContainer;
