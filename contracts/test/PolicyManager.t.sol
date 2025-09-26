@@ -35,7 +35,7 @@ contract PolicyManagerTest is Test {
     vm.label(address(mtToken), "MT Token");
 
     // Deploy PolicyManager
-    policyManager = new PolicyManager(address(usdc), address(mtToken), dev,vault, initialPrompt);
+    policyManager = new PolicyManager(address(usdc), address(mtToken), dev, vault, initialPrompt);
     vm.label(address(policyManager), "PolicyManager");
 
     // Grant MINTER_ROLE to PolicyManager so it can mint MT tokens
@@ -87,7 +87,7 @@ contract Constructor is PolicyManagerTest {
     _assumeSafeAddress(_dev);
     _assumeSafeAddress(_vault);
 
-    PolicyManager _policyManager = new PolicyManager(_usdc, _mtToken, _dev,vault, _initialPrompt);
+    PolicyManager _policyManager = new PolicyManager(_usdc, _mtToken, _dev, vault, _initialPrompt);
 
     assertEq(_policyManager.USDC(), _usdc);
     assertEq(_policyManager.MT_TOKEN(), _mtToken);
@@ -106,7 +106,7 @@ contract Constructor is PolicyManagerTest {
     _assumeSafeAddress(_dev);
 
     vm.expectRevert(PolicyManager.PolicyManager__InvalidEditRange.selector);
-    new PolicyManager(address(0), _mtToken, _dev, vault,_initialPrompt);
+    new PolicyManager(address(0), _mtToken, _dev, vault, _initialPrompt);
   }
 
   function testFuzz_RevertIf_MtTokenAddressIsZero(
@@ -119,7 +119,7 @@ contract Constructor is PolicyManagerTest {
     _assumeSafeAddress(_dev);
 
     vm.expectRevert(PolicyManager.PolicyManager__InvalidEditRange.selector);
-    new PolicyManager(_usdc, address(0), _dev,vault, _initialPrompt);
+    new PolicyManager(_usdc, address(0), _dev, vault, _initialPrompt);
   }
 
   function testFuzz_RevertIf_DevAddressIsZero(
@@ -132,7 +132,7 @@ contract Constructor is PolicyManagerTest {
     _assumeSafeAddress(_mtToken);
 
     vm.expectRevert(PolicyManager.PolicyManager__InvalidEditRange.selector);
-    new PolicyManager(_usdc, _mtToken, address(0),vault, _initialPrompt);
+    new PolicyManager(_usdc, _mtToken, address(0), vault, _initialPrompt);
   }
 }
 

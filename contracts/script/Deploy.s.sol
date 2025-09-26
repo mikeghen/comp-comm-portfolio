@@ -47,7 +47,7 @@ contract Deploy is Script {
 
     // Deploy PolicyManager
     console.log("Deploying PolicyManager...");
-    policyManager = new PolicyManager(usdc, address(managementToken), dev, vault,initialPrompt);
+    policyManager = new PolicyManager(usdc, address(managementToken), dev, vault, initialPrompt);
     console.log("PolicyManager deployed at:", address(policyManager));
 
     // Grant MINTER_ROLE to PolicyManager so it can mint tokens

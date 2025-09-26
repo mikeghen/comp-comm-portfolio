@@ -46,7 +46,7 @@ contract MessageManagerTest is Test {
     vm.label(address(mtToken), "MT Token");
 
     // Deploy SUT
-    messageManager = new MessageManager(address(usdc), address(mtToken), dev, agent, admin,vault);
+    messageManager = new MessageManager(address(usdc), address(mtToken), dev, agent, admin, vault);
     vm.label(address(messageManager), "MessageManager");
 
     // Grant mint role to SUT
@@ -109,27 +109,27 @@ contract Constructor is MessageManagerTest {
 
   function test_RevertIf_UsdcZeroAddress() public {
     vm.expectRevert(MessageManager.MessageManager__InvalidAddress.selector);
-    new MessageManager(address(0), address(mtToken), dev, agent, admin,vault);
+    new MessageManager(address(0), address(mtToken), dev, agent, admin, vault);
   }
 
   function test_RevertIf_MtTokenZeroAddress() public {
     vm.expectRevert(MessageManager.MessageManager__InvalidAddress.selector);
-    new MessageManager(address(usdc), address(0), dev, agent, admin,vault);
+    new MessageManager(address(usdc), address(0), dev, agent, admin, vault);
   }
 
   function test_RevertIf_DevZeroAddress() public {
     vm.expectRevert(MessageManager.MessageManager__InvalidAddress.selector);
-    new MessageManager(address(usdc), address(mtToken), address(0), agent, admin,vault);
+    new MessageManager(address(usdc), address(mtToken), address(0), agent, admin, vault);
   }
 
   function test_RevertIf_AgentZeroAddress() public {
     vm.expectRevert(MessageManager.MessageManager__InvalidAddress.selector);
-    new MessageManager(address(usdc), address(mtToken), dev, address(0), admin,vault);
+    new MessageManager(address(usdc), address(mtToken), dev, address(0), admin, vault);
   }
 
   function test_RevertIf_AdminZeroAddress() public {
     vm.expectRevert(MessageManager.MessageManager__InvalidAddress.selector);
-    new MessageManager(address(usdc), address(mtToken), dev, agent, address(0),vault);
+    new MessageManager(address(usdc), address(mtToken), dev, agent, address(0), vault);
   }
 }
 
