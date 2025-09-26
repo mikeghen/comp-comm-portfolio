@@ -1,5 +1,5 @@
 // Import chain IDs from wagmi
-import { base, baseSepolia } from 'wagmi/chains';
+import { base, baseSepolia, sepolia } from 'wagmi/chains';
 import { Address } from 'viem';
 
 // The wallet address from the backend
@@ -11,6 +11,7 @@ export interface CompoundNetworkContracts {
     COMP: Address;
     USDC?: Address;
     WETH?: Address;
+    WBTC?: Address;
     cbETH?: Address;
     cbBTC?: Address;
     WSTETH?: Address;
@@ -24,6 +25,7 @@ export interface CompoundNetworkContracts {
 // Chain ID constants for clarity
 const BASE_CHAIN_ID = base.id; // 8453
 const BASE_SEPOLIA_CHAIN_ID = baseSepolia.id; // 84532
+const ETH_SEPOLIA_CHAIN_ID = sepolia.id; // 11155111
 
 // TypeScript will enforce that all values are properly formatted addresses
 export const CompoundContracts: Record<number, CompoundNetworkContracts> = {
@@ -49,6 +51,16 @@ export const CompoundContracts: Record<number, CompoundNetworkContracts> = {
         WETH: "0x4200000000000000000000000000000000000006",
         cbETH: "0x774eD9EDB0C5202dF9A86183804b5D9E99dC6CA3",
         Faucet: "0xD76cB57d8B097B80a6eE4D1b4d5ef872bfBa6051"
+    },
+    // Ethereum Sepolia Testnet
+    [ETH_SEPOLIA_CHAIN_ID]: {
+        Comet: "0x571621Ce60Cebb0c1D442B5afb38B1663C6Bf017",
+        COMP: "0xA6c8D1c55951e8AC44a0EaA959Be5Fd21cc07531",
+        USDC: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+        WETH: "0x2D5ee574e710219a521449679A4A7f2B43f046ad",
+        WBTC: "0xa035b9e130F2B1AedC733eEFb1C67Ba4c503491F",
+        cUSDCv3: "0xAec1F48e02Cfb822Be958B68C7957156EB3F0b6e",
+        cWETHv3: "0x2943ac1216979aD8dB76D9147F64E61adc126e96",
     }
 };
 
@@ -83,6 +95,8 @@ export function getNetworkName(chainId?: number): string {
             return 'Base';
         case BASE_SEPOLIA_CHAIN_ID:
             return 'Base Sepolia';
+        case ETH_SEPOLIA_CHAIN_ID:
+            return 'Ethereum Sepolia';
         default:
             return `Chain ${chainId}`;
     }
@@ -93,6 +107,53 @@ export function getNetworkName(chainId?: number): string {
  */
 export function isSupportedChain(chainId?: number): boolean {
     return !!chainId && !!CompoundContracts[chainId];
+}
+
+// Network-specific wallet assets configuration
+export interface WalletAsset {
+    symbol: string;
+    contractKey: keyof CompoundNetworkContracts;
+    decimals: number;
+}
+
+export const NETWORK_WALLET_ASSETS: Record<number, WalletAsset[]> = {
+    // Base Mainnet - all assets available
+    [BASE_CHAIN_ID]: [
+        { symbol: 'USDC', contractKey: 'USDC', decimals: 6 },
+        { symbol: 'WETH', contractKey: 'WETH', decimals: 18 },
+        { symbol: 'cbETH', contractKey: 'cbETH', decimals: 18 },
+        { symbol: 'cbBTC', contractKey: 'cbBTC', decimals: 8 },
+        { symbol: 'WSTETH', contractKey: 'WSTETH', decimals: 18 },
+        { symbol: 'AERO', contractKey: 'AERO', decimals: 18 },
+        { symbol: 'cUSDCv3', contractKey: 'cUSDCv3', decimals: 6 },
+        { symbol: 'cWETHv3', contractKey: 'cWETHv3', decimals: 18 },
+        { symbol: 'cAEROv3', contractKey: 'cAEROv3', decimals: 18 },
+    ],
+    // Base Sepolia - limited assets
+    [BASE_SEPOLIA_CHAIN_ID]: [
+        { symbol: 'USDC', contractKey: 'USDC', decimals: 6 },
+        { symbol: 'WETH', contractKey: 'WETH', decimals: 18 },
+        { symbol: 'cbETH', contractKey: 'cbETH', decimals: 18 },
+    ],
+    // Ethereum Sepolia - limited assets
+    [ETH_SEPOLIA_CHAIN_ID]: [
+        { symbol: 'USDC', contractKey: 'USDC', decimals: 6 },
+        { symbol: 'WETH', contractKey: 'WETH', decimals: 18 },
+        { symbol: 'COMP', contractKey: 'COMP', decimals: 18 },
+        { symbol: 'WBTC', contractKey: 'WBTC', decimals: 8 },
+        { symbol: 'cUSDCv3', contractKey: 'cUSDCv3', decimals: 6 },
+        { symbol: 'cWETHv3', contractKey: 'cWETHv3', decimals: 18 },
+    ],
+};
+
+/**
+ * Get wallet assets for a specific chain
+ */
+export function getWalletAssetsByChainId(chainId?: number): WalletAsset[] {
+    if (!chainId || !NETWORK_WALLET_ASSETS[chainId]) {
+        return [];
+    }
+    return NETWORK_WALLET_ASSETS[chainId];
 }
 
 import ERC20_ABI from "./abi/ERC20.json";

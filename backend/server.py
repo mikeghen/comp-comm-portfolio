@@ -1,7 +1,9 @@
 """API server for the Compound Assistant."""
 
 import os
+import sys
 import json
+import logging
 from typing import List, Dict, Any
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,6 +15,20 @@ from eth_account.messages import encode_defunct
 from web3 import Web3
 
 from compound_assistant import create_agent
+
+# Configure logging to show print statements and debug info
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# Force stdout to be unbuffered for immediate print output
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
 
 # Load environment variables
 load_dotenv()
@@ -30,7 +46,10 @@ app.add_middleware(
 )
 
 # Create the agent
+print("🚀 Starting Compound Assistant server...")
+print("📡 Creating agent and loading tools...")
 agent = create_agent()
+print("✅ Agent created successfully!")
 
 # Thread ID for persistence
 THREAD_ID = "Compound Assistant"
@@ -88,6 +107,7 @@ def verify_signature(message: str, signature: str, address: str) -> bool:
 @app.websocket("/ws/chat")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
+    print("💬 New WebSocket connection established")
     try:
         while True:
             # Receive message from client
@@ -96,6 +116,8 @@ async def websocket_endpoint(websocket: WebSocket):
             user_message = data.get("message", "")
             signature = data.get("signature", "")
             address = data.get("address", "")
+            
+            print(f"📩 Received message from {address[:8]}...{address[-6:] if address else 'unknown'}: {user_message[:50]}{'...' if len(user_message) > 50 else ''}")
             
             if not user_message:
                 continue
@@ -185,4 +207,15 @@ async def websocket_endpoint(websocket: WebSocket):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+    print("🌐 Starting server on http://0.0.0.0:8000")
+    print("📝 Print statements and debug output should now be visible!")
+    
+    # Configure uvicorn to show all output and disable buffering
+    uvicorn.run(
+        app, 
+        host="0.0.0.0", 
+        port=8000,
+        log_level="info",
+        access_log=True,
+        use_colors=True
+    ) 

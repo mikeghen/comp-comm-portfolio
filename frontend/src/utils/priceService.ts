@@ -10,10 +10,12 @@ const TOKEN_TO_COINGECKO_ID: Record<string, string> = {
   'USDC': 'usd-coin',
   'WETH': 'ethereum',
   'ETH': 'ethereum', // WETH and ETH have the same price
+  'WBTC': 'bitcoin',
   'cbETH': 'coinbase-wrapped-staked-eth',
   'cbBTC': 'coinbase-wrapped-btc',
   'WSTETH': 'wrapped-steth',
   'AERO': 'aerodrome-finance',
+  'COMP': 'compound-governance-token',
   // Compound tokens use their underlying asset prices
   'cUSDCv3': 'usd-coin',
   'cWETHv3': 'ethereum',
@@ -137,6 +139,7 @@ export const FALLBACK_PRICES: Record<string, number> = {
   'cbBTC': 95000.00,
   'WSTETH': 4100.00,
   'AERO': 1.50,
+  'COMP': 85.00,
   'cUSDCv3': 1.00, // Uses USDC price
   'cWETHv3': 3500.00, // Uses ETH price
   'cAEROv3': 1.50, // Uses AERO price

@@ -6,7 +6,7 @@ import {
   getDefaultConfig
 } from '@rainbow-me/rainbowkit';
 import { WagmiConfig } from 'wagmi';
-import { base } from 'wagmi/chains';
+import { base, sepolia } from 'wagmi/chains';
 import { http } from 'viem';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -17,9 +17,10 @@ const queryClient = new QueryClient();
 const config = getDefaultConfig({
   appName: 'Compound Community Portfolio',
   projectId: 'YOUR_PROJECT_ID', // Get this from https://cloud.walletconnect.com
-  chains: [base],
+  chains: [base, sepolia],
   transports: {
     [base.id]: http(),
+    [sepolia.id]: http(),
   },
   ssr: false, // Disable server-side rendering mode
 });
