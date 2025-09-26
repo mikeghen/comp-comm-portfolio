@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
+
 import {LibBytes} from "@solady-utils/LibBytes.sol";
 import {AccessControl} from "openzeppelin/access/AccessControl.sol";
 import {ReentrancyGuard} from "openzeppelin/utils/ReentrancyGuard.sol";
@@ -192,7 +193,8 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
   /// @param replacement The replacement text.
   function _applyEdit(uint256 start, uint256 end, string calldata replacement)
     internal
-    returns (string memory)  {
+    returns (string memory)
+  {
     bytes memory promptBytes = bytes(prompt);
     // Copy the part before the edit
     bytes memory p1 = LibBytes.slice(bytes(prompt), 0, start);
