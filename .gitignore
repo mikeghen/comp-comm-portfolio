@@ -78,6 +78,7 @@ coverage.xml
 *.ntvs*
 *.njsproj
 *.sln
+.cursor
 
 # OS-specific files
 .DS_Store
