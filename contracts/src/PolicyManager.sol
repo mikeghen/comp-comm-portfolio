@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
-
+import {LibBytes} from "@solady-utils/LibBytes.sol";
 import {AccessControl} from "openzeppelin/access/AccessControl.sol";
 import {ReentrancyGuard} from "openzeppelin/utils/ReentrancyGuard.sol";
 import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
@@ -186,87 +186,22 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
     ManagementToken(MT_TOKEN).mint(to, amount);
   }
 
-  // taken from https://github.com/Vectorized/solady/blob/main/src/utils/LibBytes.sol
-  /// @dev Returns a copy of `subject` sliced from `start` to `end` (exclusive).
-  /// `start` and `end` are byte offsets.
-  function _slice(bytes memory subject, uint256 start, uint256 end)
-    internal
-    pure
-    returns (bytes memory result)
-  {
-    /// @solidity memory-safe-assembly
-    assembly {
-      let l := mload(subject) // Subject length.
-      if iszero(gt(l, end)) { end := l }
-      if iszero(gt(l, start)) { start := l }
-      if lt(start, end) {
-        result := mload(0x40)
-        let n := sub(end, start)
-        let i := add(subject, start)
-        let w := not(0x1f)
-        // Copy the `subject` one word at a time, backwards.
-        for { let j := and(add(n, 0x1f), w) } 1 {} {
-          mstore(add(result, j), mload(add(i, j)))
-          j := add(j, w) // `sub(j, 0x20)`.
-          if iszero(j) { break }
-        }
-        let o := add(add(result, 0x20), n)
-        mstore(o, 0) // Zeroize the slot after the bytes.
-        mstore(0x40, add(o, 0x20)) // Allocate memory.
-        mstore(result, n) // Store the length.
-      }
-    }
-  }
-
-  // taken from https://github.com/Vectorized/solady/blob/main/src/utils/LibBytes.sol
-  /// @dev Returns a concatenated bytes of `a` and `b`.
-  /// Cheaper than `bytes.concat()` and does not de-align the free memory pointer.
-  function _concat(bytes memory a, bytes memory b) internal pure returns (bytes memory result) {
-    /// @solidity memory-safe-assembly
-    assembly {
-      result := mload(0x40)
-      let w := not(0x1f)
-      let aLen := mload(a)
-      // Copy `a` one word at a time, backwards.
-      for { let o := and(add(aLen, 0x20), w) } 1 {} {
-        mstore(add(result, o), mload(add(a, o)))
-        o := add(o, w) // `sub(o, 0x20)`.
-        if iszero(o) { break }
-      }
-      let bLen := mload(b)
-      let output := add(result, aLen)
-      // Copy `b` one word at a time, backwards.
-      for { let o := and(add(bLen, 0x20), w) } 1 {} {
-        mstore(add(output, o), mload(add(b, o)))
-        o := add(o, w) // `sub(o, 0x20)`.
-        if iszero(o) { break }
-      }
-      let totalLen := add(aLen, bLen)
-      let last := add(add(result, 0x20), totalLen)
-      mstore(last, 0) // Zeroize the slot after the bytes.
-      mstore(result, totalLen) // Store the length.
-      mstore(0x40, add(last, 0x20)) // Allocate memory.
-    }
-  }
-
   /// @notice Internal function to apply the edit to the prompt.
   /// @param start The start index of the edit.
   /// @param end The end index of the edit.
   /// @param replacement The replacement text.
   function _applyEdit(uint256 start, uint256 end, string calldata replacement)
     internal
-    returns (string memory)
-  {
+    returns (string memory)  {
     bytes memory promptBytes = bytes(prompt);
-
     // Copy the part before the edit
-    bytes memory p1 = _slice(bytes(prompt), 0, start);
+    bytes memory p1 = LibBytes.slice(bytes(prompt), 0, start);
     // Copy the part after the edit
-    bytes memory p2 = _slice(bytes(prompt), end, promptBytes.length);
+    bytes memory p2 = LibBytes.slice(bytes(prompt), end, promptBytes.length);
     // Concatenate the edit to the fist part
-    bytes memory temp = _concat(p1, bytes(replacement));
+    bytes memory temp = LibBytes.concat(p1, bytes(replacement));
     // string(concat(concat(slice(bytes(prompt), 0, start), bytes(replacement)), p2));
 
-    prompt = string(_concat(temp, p2));
+    prompt = string(LibBytes.concat(temp, p2));
   }
 }

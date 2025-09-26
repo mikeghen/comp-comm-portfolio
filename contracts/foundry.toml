@@ -8,6 +8,7 @@
     "openzeppelin/=lib/openzeppelin-contracts/contracts/",
     "src/=src/",
     "forge-std/=lib/openzeppelin-contracts/lib/forge-std/src/",
+    "@solady-utils/=lib/solady/src/utils/",
   ]
   solc_version = "0.8.28"
   src = "src"
