@@ -5,6 +5,7 @@ import sys
 import json
 import logging
 import asyncio
+from contextlib import asynccontextmanager
 from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,7 +37,7 @@ sys.stderr.reconfigure(line_buffering=True)
 load_dotenv()
 
 # Create FastAPI app
-app = FastAPI(title="Compound Assistant API")
+app = FastAPI(title="Compound Assistant API", lifespan=lifespan)
 
 # Add CORS middleware
 app.add_middleware(
@@ -181,15 +182,16 @@ async def initialize_event_listener():
         logger.error(f"Failed to initialize event listener: {e}")
         logger.warning("Event listener disabled due to initialization error")
 
-@app.on_event("startup")
-async def startup_event():
-    """Application startup event."""
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan."""
+    # Startup
     logger.info("Starting up server...")
     await initialize_event_listener()
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Application shutdown event."""
+    yield
+    # Shutdown
     global event_listener
     if event_listener:
         event_listener.stop()

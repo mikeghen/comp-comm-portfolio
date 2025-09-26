@@ -169,7 +169,7 @@ class MessageEventListener:
             
             # Call the message processor if available
             if self.message_processor:
-                result = await asyncio.to_thread(self.message_processor, {
+                result = await self.message_processor({
                     'message': message_text,
                     'payer': payer
                 })
@@ -228,7 +228,7 @@ class MessageEventListener:
                 "source": "event_driven"
             }
             
-            await asyncio.to_thread(self.websocket_broadcaster, json.dumps(broadcast_data))
+            await self.websocket_broadcaster(json.dumps(broadcast_data))
             
         except Exception as e:
             logger.error(f"Error broadcasting response: {e}")
