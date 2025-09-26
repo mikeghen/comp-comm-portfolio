@@ -203,6 +203,10 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
         ManagementToken(MT_TOKEN).mint(to, amount);
     }
 
+
+    // taken from https://github.com/Vectorized/solady/blob/main/src/utils/LibBytes.sol
+    /// @dev Returns a copy of `subject` sliced from `start` to `end` (exclusive).
+    /// `start` and `end` are byte offsets.
     function slice(
         bytes memory subject,
         uint256 start,
@@ -242,6 +246,9 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
         }
     }
 
+    // taken from https://github.com/Vectorized/solady/blob/main/src/utils/LibBytes.sol
+    /// @dev Returns a concatenated bytes of `a` and `b`.
+    /// Cheaper than `bytes.concat()` and does not de-align the free memory pointer.
     function concat(
         bytes memory a,
         bytes memory b
