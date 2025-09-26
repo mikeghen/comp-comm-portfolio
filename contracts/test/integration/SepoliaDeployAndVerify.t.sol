@@ -266,7 +266,7 @@ contract SepoliaDeployAndVerifyIntegration is Test {
   }
 
   function test_AgentSwap_WBTC_to_USDC_Sepolia() public {
-    uint256 wbtcAmt = 1e2; // 0.0000001 WBTC (8 decimals) - small amount for liquidity
+    uint256 wbtcAmt = 1e2; // 0.000001 WBTC (8 decimals) - small amount for liquidity
     deal(WBTC, address(vault), wbtcAmt);
 
     vm.startPrank(agent);
