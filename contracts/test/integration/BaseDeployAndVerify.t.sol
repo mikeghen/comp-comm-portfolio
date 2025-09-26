@@ -156,7 +156,10 @@ contract BaseDeployAndVerifyIntegration is Test {
     vm.prank(agent);
     msgMgr.markMessageProcessed(digest);
     assertTrue(msgMgr.processedMessages(digest));
-
+    uint256 usdcBalance = IERC20(USDC).balanceOf(address(vault));
+    vm.startPrank(agent);
+    _trySwap(USDC, WETH, usdcBalance);
+    vm.stopPrank();
     // ---- Arrange: move to REDEMPTION phase and fund vault with WETH
     vm.warp(vault.UNLOCK_TIMESTAMP() + 1);
     // Consolidate by ensuring only WETH is held; for test simply fund WETH to vault
