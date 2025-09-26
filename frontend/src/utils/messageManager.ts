@@ -11,7 +11,7 @@ export const MESSAGE_MANAGER_DOMAIN = {
 } as const;
 
 // Message struct type for EIP-712
-export interface MessageStruct {
+export interface MessageStruct extends Record<string, unknown> {
   messageHash: `0x${string}`;
   payer: `0x${string}`;
   nonce: bigint;
