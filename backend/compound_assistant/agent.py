@@ -7,7 +7,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph, MessagesState
 from langgraph.checkpoint.memory import MemorySaver
 from compound_assistant.utils.nodes import call_agent, should_continue, create_tool_node
-from compound_assistant.utils.tools import get_tools
+from compound_assistant.utils.tools_simplified import get_tools
 
 def load_system_prompt():
     """

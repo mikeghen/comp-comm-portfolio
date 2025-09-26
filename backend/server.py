@@ -4,7 +4,8 @@ import os
 import sys
 import json
 import logging
-from typing import List, Dict, Any
+import asyncio
+from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -15,6 +16,7 @@ from eth_account.messages import encode_defunct
 from web3 import Web3
 
 from compound_assistant import create_agent
+from compound_assistant.event_listener import MessageEventListener
 
 # Configure logging to show print statements and debug info
 logging.basicConfig(
@@ -57,6 +59,9 @@ THREAD_ID = "Compound Assistant"
 # Initialize Web3 for signature verification
 w3 = Web3()
 
+# Global event listener
+event_listener: Optional[MessageEventListener] = None
+
 # Define message model
 class Message(BaseModel):
     role: str
@@ -78,12 +83,117 @@ class ConnectionManager:
         self.active_connections.append(websocket)
 
     def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
 
     async def send_message(self, message: str, websocket: WebSocket):
-        await websocket.send_text(message)
+        try:
+            await websocket.send_text(message)
+        except Exception as e:
+            logger.error(f"Error sending message to websocket: {e}")
+            self.disconnect(websocket)
+    
+    async def broadcast(self, message: str):
+        """Broadcast message to all connected clients."""
+        if not self.active_connections:
+            return
+            
+        # Send to all connections, removing failed ones
+        failed_connections = []
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except Exception as e:
+                logger.error(f"Failed to broadcast to connection: {e}")
+                failed_connections.append(connection)
+        
+        # Remove failed connections
+        for connection in failed_connections:
+            self.disconnect(connection)
 
 manager = ConnectionManager()
+
+async def process_agent_message(message_data: Dict[str, Any]) -> Optional[str]:
+    """Process a message through the agent (used by event listener)."""
+    try:
+        user_message = message_data.get('message', '')
+        payer = message_data.get('payer', '')
+        
+        if not user_message:
+            return None
+        
+        logger.info(f"Processing agent message from event: {user_message[:50]}...")
+        
+        # Create config with thread ID for persistence
+        config = {"configurable": {"thread_id": THREAD_ID}}
+        
+        # Process message with agent
+        response_content = []
+        
+        for chunk in agent.stream(
+            {"messages": [HumanMessage(content=user_message)]}, 
+            config
+        ):
+            if "agent" in chunk:
+                agent_message = chunk["agent"]["messages"][0]
+                if agent_message.content:
+                    response_content.append(agent_message.content)
+            elif "tools" in chunk:
+                tool_response = chunk["tools"]["messages"][0].content
+                response_content.append(f"Tool result: {tool_response}")
+        
+        return "\n".join(response_content) if response_content else "Message processed successfully."
+        
+    except Exception as e:
+        logger.error(f"Error processing agent message: {e}")
+        return f"Error processing message: {str(e)}"
+
+async def broadcast_message(message: str):
+    """Broadcast a message to all WebSocket connections."""
+    await manager.broadcast(message)
+
+async def initialize_event_listener():
+    """Initialize and start the event listener."""
+    global event_listener
+    
+    try:
+        network_id = int(os.getenv("NETWORK_ID", "11155111"))
+        private_key = os.getenv("PRIVATE_KEY", "")
+        
+        if not private_key or private_key == "0x...":
+            logger.warning("No private key configured, event listener disabled")
+            return
+            
+        logger.info(f"Initializing event listener for network {network_id}")
+        
+        event_listener = MessageEventListener(
+            network_id=network_id,
+            private_key=private_key,
+            message_processor=process_agent_message,
+            websocket_broadcaster=broadcast_message
+        )
+        
+        # Start listening in background
+        asyncio.create_task(event_listener.start_listening())
+        logger.info("Event listener started successfully")
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize event listener: {e}")
+        logger.warning("Event listener disabled due to initialization error")
+
+@app.on_event("startup")
+async def startup_event():
+    """Application startup event."""
+    logger.info("Starting up server...")
+    await initialize_event_listener()
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Application shutdown event."""
+    global event_listener
+    if event_listener:
+        event_listener.stop()
+        logger.info("Event listener stopped")
 
 def verify_signature(message: str, signature: str, address: str) -> bool:
     """Verify that the signature was created by the provided address."""
