@@ -14,7 +14,7 @@ import {MessageManager} from "src/MessageManager.sol";
 import {VaultManager} from "src/VaultManager.sol";
 
 /// @notice Integration test that deploys via BaseNetworkDeploy and verifies roles and flows
-contract DeployAndVerifyIntegration is Test {
+contract BaseDeployAndVerifyIntegration is Test {
   // Fork config
   string rpcAlias = "base_mainnet";
 
@@ -34,7 +34,10 @@ contract DeployAndVerifyIntegration is Test {
   // Base addresses
   address constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
   address constant WETH = 0x4200000000000000000000000000000000000006;
+  address constant AERO = 0x940181a94A35A4569E4529A3CDfB74e38FD98631;
   address constant COMET_USDC = 0xb125E6687d4313864e53df431d5425969c15Eb2F;
+  address constant COMET_WETH = 0x46e6b214b524310239732D51387075E0e70970bf;
+  address constant COMET_AERO = 0x784efeB622244d2348d4F2522f8860B96fbEcE89;
 
   function setUp() public virtual {
     string memory rpc = vm.rpcUrl(rpcAlias);
@@ -81,7 +84,7 @@ contract DeployAndVerifyIntegration is Test {
     vm.stopPrank();
   }
 
-  function test_DeployedContractsAndRolesConfigured() public {
+  function test_DeployedContractsAndRolesConfigured() public view {
     // Token roles
     assertTrue(mt.hasRole(mt.DEFAULT_ADMIN_ROLE(), admin));
     assertTrue(mt.hasRole(mt.MINTER_ROLE(), address(policy)));
@@ -99,6 +102,27 @@ contract DeployAndVerifyIntegration is Test {
     // Vault
     assertEq(vault.owner(), admin);
     assertTrue(vault.hasRole(keccak256("AGENT_ROLE"), agent));
+  }
+
+  function test_VaultAssetsAndCometsConfigured() public view {
+    // Core assets should be allowed
+    assertTrue(vault.allowedAssets(USDC), "USDC should be allowed");
+    assertTrue(vault.allowedAssets(WETH), "WETH should be allowed");
+
+    // Additional Base-specific asset should be allowed
+    assertTrue(vault.allowedAssets(AERO), "AERO should be allowed");
+
+    // Core comets should be allowed
+    assertTrue(vault.allowedComets(COMET_USDC), "COMET_USDC should be allowed");
+    assertTrue(vault.allowedComets(COMET_WETH), "COMET_WETH should be allowed");
+
+    // Additional Base-specific comet should be allowed
+    assertTrue(vault.allowedComets(COMET_AERO), "COMET_AERO should be allowed");
+
+    // Asset-to-comet mappings should be configured
+    assertEq(vault.assetToComet(USDC), COMET_USDC, "USDC->COMET_USDC mapping");
+    assertEq(vault.assetToComet(WETH), COMET_WETH, "WETH->COMET_WETH mapping");
+    assertEq(vault.assetToComet(AERO), COMET_AERO, "AERO->COMET_AERO mapping");
   }
 
   function test_TokenMintViaPolicyEditAndMessagePay_BurnViaVaultRedeem() public {
@@ -149,14 +173,17 @@ contract DeployAndVerifyIntegration is Test {
     assertEq(IERC20(WETH).balanceOf(user), expectedWethOut);
   }
 
-  function _trySwapUSDCtoWETH(uint256 amountIn) internal returns (uint256 amountOut) {
+  function _trySwap(address tokenIn, address tokenOut, uint256 amountIn)
+    internal
+    returns (uint256 amountOut)
+  {
     // Try common v3 fee tiers
     uint24[3] memory FEES = [uint24(500), uint24(3000), uint24(10_000)];
     for (uint256 i = 0; i < FEES.length; i++) {
       try vault.exactInputSingle(
         ISwapRouter.ExactInputSingleParams({
-          tokenIn: USDC,
-          tokenOut: WETH,
+          tokenIn: tokenIn,
+          tokenOut: tokenOut,
           fee: FEES[i],
           recipient: address(vault),
           amountIn: amountIn,
@@ -171,25 +198,175 @@ contract DeployAndVerifyIntegration is Test {
     revert("no viable v3 pool");
   }
 
-  function test_AgentAbilities_UniswapAndCompound() public {
-    // ---- Arrange: fund vault with USDC
+  // ---- Uniswap Swap Tests ----
+
+  function test_AgentSwap_USDC_to_WETH() public {
+    uint256 usdcAmt = 1000e6;
+    deal(USDC, address(vault), usdcAmt);
+
+    vm.prank(agent);
+    uint256 wethOut = _trySwap(USDC, WETH, usdcAmt);
+    vm.stopPrank();
+
+    assertGt(wethOut, 0, "Should receive WETH from USDC swap");
+    assertEq(IERC20(USDC).balanceOf(address(vault)), 0, "USDC should be fully swapped");
+  }
+
+  function test_AgentSwap_WETH_to_USDC() public {
+    uint256 wethAmt = 1 ether;
+    deal(WETH, address(vault), wethAmt);
+
+    vm.startPrank(agent);
+    uint256 usdcOut = _trySwap(WETH, USDC, wethAmt);
+    vm.stopPrank();
+
+    assertGt(usdcOut, 0, "Should receive USDC from WETH swap");
+    assertEq(IERC20(WETH).balanceOf(address(vault)), 0, "WETH should be fully swapped");
+  }
+
+  function test_AgentSwap_USDC_to_AERO() public {
+    uint256 usdcAmt = 1000e6;
+    deal(USDC, address(vault), usdcAmt);
+
+    vm.startPrank(agent);
+    uint256 aeroOut = _trySwap(USDC, AERO, usdcAmt);
+    vm.stopPrank();
+
+    assertGt(aeroOut, 0, "Should receive AERO from USDC swap");
+    assertEq(IERC20(USDC).balanceOf(address(vault)), 0, "USDC should be fully swapped");
+  }
+
+  function test_AgentSwap_AERO_to_USDC() public {
+    uint256 aeroAmt = 1000e18;
+    deal(AERO, address(vault), aeroAmt);
+
+    vm.startPrank(agent);
+    uint256 usdcOut = _trySwap(AERO, USDC, aeroAmt);
+    vm.stopPrank();
+
+    assertGt(usdcOut, 0, "Should receive USDC from AERO swap");
+    assertEq(IERC20(AERO).balanceOf(address(vault)), 0, "AERO should be fully swapped");
+  }
+
+  function test_AgentSwap_WETH_to_AERO() public {
+    uint256 wethAmt = 1 ether;
+    deal(WETH, address(vault), wethAmt);
+
+    vm.startPrank(agent);
+    uint256 aeroOut = _trySwap(WETH, AERO, wethAmt);
+    vm.stopPrank();
+
+    assertGt(aeroOut, 0, "Should receive AERO from WETH swap");
+    assertEq(IERC20(WETH).balanceOf(address(vault)), 0, "WETH should be fully swapped");
+  }
+
+  function test_AgentSwap_AERO_to_WETH() public {
+    uint256 aeroAmt = 1000e18;
+    deal(AERO, address(vault), aeroAmt);
+
+    vm.startPrank(agent);
+    uint256 wethOut = _trySwap(AERO, WETH, aeroAmt);
+    vm.stopPrank();
+
+    assertGt(wethOut, 0, "Should receive WETH from AERO swap");
+    assertEq(IERC20(AERO).balanceOf(address(vault)), 0, "AERO should be fully swapped");
+  }
+
+  // ---- Compound Supply Tests ----
+
+  function test_AgentCompound_Supply_USDC() public {
     uint256 usdcAmt = 2000e6;
     deal(USDC, address(vault), usdcAmt);
 
-    // Allowlist already set by deploy script
-
-    // ---- Act: as agent, perform swap USDC->WETH
-    vm.prank(agent);
-    uint256 wethOut = _trySwapUSDCtoWETH(usdcAmt / 2);
-    assertGt(wethOut, 0);
-
-    // ---- Act: as agent, supply remaining USDC to USDC Comet
-    uint256 remainingUSDC = IERC20(USDC).balanceOf(address(vault));
     uint256 cometBefore = IComet(COMET_USDC).balanceOf(address(vault));
     vm.prank(agent);
-    vault.supply(USDC, remainingUSDC);
+    vault.supply(USDC, usdcAmt);
     uint256 cometAfter = IComet(COMET_USDC).balanceOf(address(vault));
-    assertGe(cometAfter, cometBefore + remainingUSDC - 1);
+
+    assertGe(cometAfter, cometBefore + usdcAmt - 1, "Comet balance should increase");
+    assertEq(IERC20(USDC).balanceOf(address(vault)), 0, "USDC should be fully supplied");
+  }
+
+  function test_AgentCompound_Supply_WETH() public {
+    uint256 wethAmt = 2 ether;
+    deal(WETH, address(vault), wethAmt);
+
+    uint256 cometBefore = IComet(COMET_WETH).balanceOf(address(vault));
+    vm.prank(agent);
+    vault.supply(WETH, wethAmt);
+    uint256 cometAfter = IComet(COMET_WETH).balanceOf(address(vault));
+
+    assertGe(cometAfter, cometBefore + wethAmt - 1, "Comet balance should increase");
+    assertEq(IERC20(WETH).balanceOf(address(vault)), 0, "WETH should be fully supplied");
+  }
+
+  function test_AgentCompound_Supply_AERO() public {
+    uint256 aeroAmt = 1000e18;
+    deal(AERO, address(vault), aeroAmt);
+
+    uint256 cometBefore = IComet(COMET_AERO).balanceOf(address(vault));
+    vm.prank(agent);
+    vault.supply(AERO, aeroAmt);
+    uint256 cometAfter = IComet(COMET_AERO).balanceOf(address(vault));
+
+    assertGe(cometAfter, cometBefore + aeroAmt - 1, "Comet balance should increase");
+    assertEq(IERC20(AERO).balanceOf(address(vault)), 0, "AERO should be fully supplied");
+  }
+
+  // ---- Compound Withdraw Tests ----
+
+  function test_AgentCompound_Withdraw_USDC() public {
+    uint256 usdcAmt = 2000e6;
+    deal(USDC, address(vault), usdcAmt);
+
+    // First supply
+    vm.prank(agent);
+    vault.supply(USDC, usdcAmt);
+
+    // Then withdraw half
+    uint256 withdrawAmt = usdcAmt / 2;
+    uint256 usdcBefore = IERC20(USDC).balanceOf(address(vault));
+    vm.prank(agent);
+    vault.withdraw(USDC, withdrawAmt);
+    uint256 usdcAfter = IERC20(USDC).balanceOf(address(vault));
+
+    assertGe(usdcAfter, usdcBefore + withdrawAmt - 1, "USDC balance should increase");
+  }
+
+  function test_AgentCompound_Withdraw_WETH() public {
+    uint256 wethAmt = 2 ether;
+    deal(WETH, address(vault), wethAmt);
+
+    // First supply
+    vm.prank(agent);
+    vault.supply(WETH, wethAmt);
+
+    // Then withdraw half
+    uint256 withdrawAmt = wethAmt / 2;
+    uint256 wethBefore = IERC20(WETH).balanceOf(address(vault));
+    vm.prank(agent);
+    vault.withdraw(WETH, withdrawAmt);
+    uint256 wethAfter = IERC20(WETH).balanceOf(address(vault));
+
+    assertGe(wethAfter, wethBefore + withdrawAmt - 1, "WETH balance should increase");
+  }
+
+  function test_AgentCompound_Withdraw_AERO() public {
+    uint256 aeroAmt = 1000e18;
+    deal(AERO, address(vault), aeroAmt);
+
+    // First supply
+    vm.prank(agent);
+    vault.supply(AERO, aeroAmt);
+
+    // Then withdraw half
+    uint256 withdrawAmt = aeroAmt / 2;
+    uint256 aeroBefore = IERC20(AERO).balanceOf(address(vault));
+    vm.prank(agent);
+    vault.withdraw(AERO, withdrawAmt);
+    uint256 aeroAfter = IERC20(AERO).balanceOf(address(vault));
+
+    assertGe(aeroAfter, aeroBefore + withdrawAmt - 1, "AERO balance should increase");
   }
 
   function test_AdminAbilities_SetAgent() public {

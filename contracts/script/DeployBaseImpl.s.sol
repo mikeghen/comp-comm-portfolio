@@ -26,12 +26,15 @@ contract DeployBaseImpl is Script {
   // ---- Network addresses ----
   address public USDC;
   address public WETH;
-  address public AERO;
   address public UNISWAP_V3_ROUTER;
   address public COMET_REWARDS;
   address public COMET_USDC;
   address public COMET_WETH;
-  address public COMET_AERO;
+
+  // ---- Additional assets and comets (network-specific) ----
+  address[] public additionalAssets;
+  address[] public additionalComets;
+  mapping(address => address) public assetToCometMapping;
 
   // ---- Misc config ----
   string public initialPrompt;
@@ -120,19 +123,37 @@ contract DeployBaseImpl is Script {
     console.log("VaultManager:", address(vaultManager));
 
     // ---- Configure vault allowlists and comets ----
-    // Allow a basic set used in integration tests; these no-ops if zero.
-    if (AERO != address(0)) vaultManager.setAllowedAsset(AERO, true);
+    // Allow core assets (always present)
     vaultManager.setAllowedAsset(USDC, true);
     vaultManager.setAllowedAsset(WETH, true);
 
-    if (COMET_USDC != address(0)) vaultManager.setAllowedComet(COMET_USDC, true);
-    if (COMET_WETH != address(0)) vaultManager.setAllowedComet(COMET_WETH, true);
-    if (COMET_AERO != address(0)) vaultManager.setAllowedComet(COMET_AERO, true);
+    // Allow additional network-specific assets
+    for (uint256 i = 0; i < additionalAssets.length; i++) {
+      if (additionalAssets[i] != address(0)) {
+        vaultManager.setAllowedAsset(additionalAssets[i], true);
+      }
+    }
 
-    if (COMET_USDC != address(0)) vaultManager.setAssetComet(USDC, COMET_USDC);
-    if (COMET_WETH != address(0)) vaultManager.setAssetComet(WETH, COMET_WETH);
-    if (AERO != address(0) && COMET_AERO != address(0)) {
-      vaultManager.setAssetComet(AERO, COMET_AERO);
+    // Allow core comets (always present)
+    vaultManager.setAllowedComet(COMET_USDC, true);
+    vaultManager.setAllowedComet(COMET_WETH, true);
+
+    // Allow additional network-specific comets
+    for (uint256 i = 0; i < additionalComets.length; i++) {
+      if (additionalComets[i] != address(0)) {
+        vaultManager.setAllowedComet(additionalComets[i], true);
+      }
+    }
+
+    // Set core asset-to-comet mappings
+    vaultManager.setAssetComet(USDC, COMET_USDC);
+    vaultManager.setAssetComet(WETH, COMET_WETH);
+
+    // Set additional asset-to-comet mappings
+    for (uint256 i = 0; i < additionalAssets.length; i++) {
+      address asset = additionalAssets[i];
+      address comet = assetToCometMapping[asset];
+      if (asset != address(0) && comet != address(0)) vaultManager.setAssetComet(asset, comet);
     }
 
     // ---- Transfer ownership of vault to admin (Ownable2Step) ----
@@ -163,12 +184,29 @@ contract DeployBaseImpl is Script {
     _logSummary();
   }
 
+  /// @notice Add an additional asset to be configured (used by network-specific scripts)
+  function _addAdditionalAsset(address asset) internal {
+    additionalAssets.push(asset);
+  }
+
+  /// @notice Add an additional comet to be configured (used by network-specific scripts)
+  function _addAdditionalComet(address comet) internal {
+    additionalComets.push(comet);
+  }
+
+  /// @notice Set asset-to-comet mapping for additional assets (used by network-specific scripts)
+  function _setAssetCometMapping(address asset, address comet) internal {
+    assetToCometMapping[asset] = comet;
+  }
+
   function _validateNetworkAddresses() internal view {
     require(USDC != address(0), "Deploy: USDC not set");
     require(WETH != address(0), "Deploy: WETH not set");
     require(UNISWAP_V3_ROUTER != address(0), "Deploy: router not set");
     require(COMET_REWARDS != address(0), "Deploy: cometRewards not set");
-    // Comets and AERO can be optional
+    require(COMET_USDC != address(0), "Deploy: COMET_USDC not set");
+    require(COMET_WETH != address(0), "Deploy: COMET_WETH not set");
+    // Additional assets and comets are optional and network-specific
   }
 
   function _logSummary() internal view {
@@ -179,9 +217,21 @@ contract DeployBaseImpl is Script {
     console.log("dev:", dev);
     console.log("USDC:", USDC);
     console.log("WETH:", WETH);
-    console.log("AERO:", AERO);
     console.log("router:", UNISWAP_V3_ROUTER);
     console.log("cometRewards:", COMET_REWARDS);
+    console.log("COMET_USDC:", COMET_USDC);
+    console.log("COMET_WETH:", COMET_WETH);
+
+    // Log additional assets
+    for (uint256 i = 0; i < additionalAssets.length; i++) {
+      console.log("additionalAsset[%d]:", i, additionalAssets[i]);
+    }
+
+    // Log additional comets
+    for (uint256 i = 0; i < additionalComets.length; i++) {
+      console.log("additionalComet[%d]:", i, additionalComets[i]);
+    }
+
     console.log("MT:", address(managementToken));
     console.log("PolicyManager:", address(policyManager));
     console.log("MessageManager:", address(messageManager));

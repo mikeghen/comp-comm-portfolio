@@ -40,3 +40,4 @@
 
 [rpc_endpoints]
   base_mainnet = "https://mainnet.base.org/"
+  sepolia = "https://sepolia.gateway.tenderly.co/"
