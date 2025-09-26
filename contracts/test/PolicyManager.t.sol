@@ -252,10 +252,9 @@ contract EditPrompt is PolicyManagerTest {
     uint256 promptLength = bytes(currentPrompt).length;
     (_start, _end) = _boundToReasonableEditRange(_start, _end, promptLength);
 
-    // Create replacement of exact range length, ensuring final policy size <= 2048
+    // Create replacement of exact range length, ensuring final policy size <= MAX_POLICY_SIZE
     uint256 rangeLength = _end - _start;
-    uint256 maxFinalSize = promptLength - rangeLength + rangeLength; // This equals promptLength
-    vm.assume(maxFinalSize <= 2048); // Ensure we don't exceed limit
+    _assumeValidPolicySize(promptLength);
 
     if (rangeLength == 0) _replacement = "";
     else _replacement = _generateReplacementString(rangeLength);
@@ -383,10 +382,9 @@ contract EditPrompt is PolicyManagerTest {
     uint256 promptLength = bytes(currentPrompt).length;
     (_start, _end) = _boundToReasonableEditRange(_start, _end, promptLength);
 
-    // Create replacement of exact range length, ensuring final policy size <= 2048
+    // Create replacement of exact range length, ensuring final policy size <= MAX_POLICY_SIZE
     uint256 rangeLength = _end - _start;
-    uint256 maxFinalSize = promptLength - rangeLength + rangeLength; // This equals promptLength
-    vm.assume(maxFinalSize <= 2048); // Ensure we don't exceed limit
+    _assumeValidPolicySize(promptLength);
 
     bytes memory newReplacement = new bytes(rangeLength);
     for (uint256 i = 0; i < rangeLength; i++) {
@@ -582,10 +580,9 @@ contract GetPrompt is PolicyManagerTest {
     uint256 promptLength = bytes(currentPrompt).length;
     (_start, _end) = _boundToReasonableEditRange(_start, _end, promptLength);
 
-    // Create replacement of exact range length, ensuring final policy size <= 2048
+    // Create replacement of exact range length, ensuring final policy size <= MAX_POLICY_SIZE
     uint256 rangeLength = _end - _start;
-    uint256 maxFinalSize = promptLength - rangeLength + rangeLength; // This equals promptLength
-    vm.assume(maxFinalSize <= 2048); // Ensure we don't exceed limit
+    _assumeValidPolicySize(promptLength);
 
     bytes memory newReplacement = new bytes(rangeLength);
     for (uint256 i = 0; i < rangeLength; i++) {
