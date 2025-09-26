@@ -102,7 +102,7 @@ const MessageInputStatesDemo: React.FC = () => {
             <ul className="mb-0">
               <li>Dynamic button states based on wallet/approval status</li>
               <li>EIP-712 signature generation for MessageManager domain</li>
-              <li>USDC approval with buffer for multiple messages</li>
+              <li>USDC approval for exact message amount (10 USDC per message)</li>
               <li>Proper error handling and loading states</li>
               <li>Fallback to original "Send" behavior when contracts unavailable</li>
             </ul>

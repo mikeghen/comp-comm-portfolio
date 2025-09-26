@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Form, Button, Card, Spinner } from 'react-bootstrap';
+import React, { useState, useEffect } from 'react';
+import { Form, Button, Card, Spinner, Toast, ToastContainer } from 'react-bootstrap';
 import { useAccount, useWriteContract, useSignTypedData } from 'wagmi';
 import { useUSDCApproval } from '../../hooks/useUSDCApproval';
 import { ERC20_ABI, MESSAGE_MANAGER_ABI, getContractAddress } from '../../config/contracts';
@@ -27,7 +27,9 @@ function MessageInput({
   isThinking 
 }: MessageInputProps) {
   const { address: userAddress, chainId } = useAccount();
-  const [isProcessingTx, setIsProcessingTx] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastVariant, setToastVariant] = useState<'success' | 'danger'>('success');
   
   // Get USDC approval status
   const { 
@@ -35,40 +37,88 @@ function MessageInput({
     hasSufficientBalance, 
     isLoading: isLoadingApproval,
     usdcAddress,
-    messageManagerAddress 
+    messageManagerAddress,
+    refetchAllowance 
   } = useUSDCApproval();
 
   // Contract write hooks
-  const { writeContract: writeApproval, isPending: isApprovalPending } = useWriteContract();
-  const { writeContract: writePayMessage, isPending: isPayMessagePending } = useWriteContract();
+  const { 
+    writeContract: writeApproval, 
+    isPending: isApprovalPending,
+    isSuccess: isApprovalSuccess,
+    isError: isApprovalError,
+    error: approvalError
+  } = useWriteContract();
+  
+  const { 
+    writeContract: writePayMessage, 
+    isPending: isPayMessagePending,
+    isSuccess: isPayMessageSuccess,
+    isError: isPayMessageError,
+    error: payMessageError
+  } = useWriteContract();
+  
   const { signTypedData, isPending: isSignaturePending } = useSignTypedData();
+
+  // Handle success and error states
+  useEffect(() => {
+    if (isApprovalSuccess) {
+      setToastMessage('USDC approval successful!');
+      setToastVariant('success');
+      setShowToast(true);
+      // Refetch allowance to update button state
+      refetchAllowance();
+    }
+  }, [isApprovalSuccess, refetchAllowance]);
+
+  useEffect(() => {
+    if (isApprovalError) {
+      setToastMessage(`Approval failed: ${approvalError?.message || 'Unknown error'}`);
+      setToastVariant('danger');
+      setShowToast(true);
+    }
+  }, [isApprovalError, approvalError]);
+
+  useEffect(() => {
+    if (isPayMessageSuccess) {
+      setToastMessage('Payment successful! Message sent.');
+      setToastVariant('success');
+      setShowToast(true);
+      // Send message through original flow after successful payment
+      sendMessage();
+    }
+  }, [isPayMessageSuccess, sendMessage]);
+
+  useEffect(() => {
+    if (isPayMessageError) {
+      setToastMessage(`Payment failed: ${payMessageError?.message || 'Unknown error'}`);
+      setToastVariant('danger');
+      setShowToast(true);
+    }
+  }, [isPayMessageError, payMessageError]);
 
   // Check if we can show the integrated send button
   const canShowIntegratedButton = userAddress && usdcAddress && messageManagerAddress && chainId;
-  const isAnyPending = isApprovalPending || isPayMessagePending || isSignaturePending || isProcessingTx;
+  const isAnyPending = isApprovalPending || isPayMessagePending || isSignaturePending;
 
   const handleApproveUSDC = async () => {
     if (!usdcAddress || !messageManagerAddress) return;
     
-    setIsProcessingTx(true);
     try {
       await writeApproval({
         address: usdcAddress,
         abi: ERC20_ABI,
         functionName: 'approve',
-        args: [messageManagerAddress, BigInt(MESSAGE_PRICE_USDC) * 1000n], // Approve for many messages
+        args: [messageManagerAddress, BigInt(MESSAGE_PRICE_USDC)], // Only approve 10 USDC
       });
     } catch (error) {
       console.error('Approval failed:', error);
-    } finally {
-      setIsProcessingTx(false);
     }
   };
 
   const handlePayAndSignMessage = async () => {
     if (!userAddress || !chainId || !messageManagerAddress || !input.trim()) return;
 
-    setIsProcessingTx(true);
     try {
       // Create message struct
       const messageStruct = createMessageStruct(input, userAddress);
@@ -86,13 +136,10 @@ function MessageInput({
         functionName: 'payForMessageWithSig',
         args: [messageStruct, signature, input], // messageURI is the original input
       });
-
-      // If successful, also send the message through the original flow
-      sendMessage();
+      
+      // Success/error handling is done in useEffect hooks above
     } catch (error) {
       console.error('Pay and sign failed:', error);
-    } finally {
-      setIsProcessingTx(false);
     }
   };
 
@@ -165,6 +212,26 @@ function MessageInput({
           {buttonConfig.text}
         </Button>
       </div>
+      
+      {/* Toast notifications */}
+      <ToastContainer position="top-end" className="p-3">
+        <Toast 
+          show={showToast} 
+          onClose={() => setShowToast(false)} 
+          delay={5000} 
+          autohide
+          bg={toastVariant}
+        >
+          <Toast.Header closeButton={false}>
+            <strong className="me-auto text-white">
+              {toastVariant === 'success' ? 'Success' : 'Error'}
+            </strong>
+          </Toast.Header>
+          <Toast.Body className="text-white">
+            {toastMessage}
+          </Toast.Body>
+        </Toast>
+      </ToastContainer>
     </Card.Footer>
   );
 }

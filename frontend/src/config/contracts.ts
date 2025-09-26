@@ -64,7 +64,7 @@ export const CompoundContracts: Record<number, CompoundNetworkContracts> = {
         WBTC: "0xa035b9e130F2B1AedC733eEFb1C67Ba4c503491F",
         cUSDCv3: "0xAec1F48e02Cfb822Be958B68C7957156EB3F0b6e",
         cWETHv3: "0x2943ac1216979aD8dB76D9147F64E61adc126e96",
-        MessageManager: "0x0000000000000000000000000000000000000000", // Placeholder - replace with actual deployment address
+        MessageManager: "0xDDc10602782af652bB913f7bdE1fD82981Db7dd9", // Sepolia MessageManager address
     }
 };
 
