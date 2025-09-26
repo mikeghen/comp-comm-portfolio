@@ -64,7 +64,7 @@ contract BaseDeployAndVerifyIntegration is Test {
 
     // Execute deployment (no vm.startBroadcast inside due to keys=0)
     BaseNetworkDeploy d = new BaseNetworkDeploy();
-    d.setup();
+    d.setUp();
     d.run();
 
     // Wire instances

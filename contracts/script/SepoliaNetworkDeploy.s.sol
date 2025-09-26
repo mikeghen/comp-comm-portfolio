@@ -6,8 +6,8 @@ import {DeployBaseImpl} from "./DeployBaseImpl.s.sol";
 /// @title SepoliaNetworkDeploy
 /// @notice ETH Sepolia testnet configuration for deploying CompComm portfolio contracts
 contract SepoliaNetworkDeploy is DeployBaseImpl {
-  /// @dev Set ETH Sepolia testnet addresses and then call parent setup to pull env configs.
-  function setup() public override {
+  /// @dev Set ETH Sepolia testnet addresses and then call parent setUp to pull env configs.
+  function setUp() public override {
     // ---- ETH Sepolia testnet core addresses ----
     USDC = 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238;
     WETH = 0x2D5ee574e710219a521449679A4A7f2B43f046ad;
@@ -33,7 +33,7 @@ contract SepoliaNetworkDeploy is DeployBaseImpl {
     // So we don't add any additional comets or mappings
 
     // Inherit env-driven actor configuration
-    super.setup();
+    super.setUp();
   }
 
   function run() public override {

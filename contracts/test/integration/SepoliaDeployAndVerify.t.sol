@@ -65,7 +65,7 @@ contract SepoliaDeployAndVerifyIntegration is Test {
 
     // Execute deployment (no vm.startBroadcast inside due to keys=0)
     SepoliaNetworkDeploy d = new SepoliaNetworkDeploy();
-    d.setup();
+    d.setUp();
     d.run();
 
     // Wire instances

@@ -44,7 +44,7 @@ contract DeployBaseImpl is Script {
   uint256 public adminPrivateKey; // used to accept vault ownership (Ownable2Step)
 
   /// @notice Initialize config from environment. Network addresses must be set by child.
-  function setup() public virtual {
+  function setUp() public virtual {
     // Admin/agent/dev may come from env, otherwise default to tx.origin for local/test runs
     try vm.envAddress("ADMIN_ADDRESS") returns (address _admin) {
       admin = _admin;

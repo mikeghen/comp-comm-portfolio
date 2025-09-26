@@ -7,7 +7,7 @@ import {DeployBaseImpl} from "./DeployBaseImpl.s.sol";
 /// @notice Base mainnet configuration for deploying CompComm portfolio contracts
 contract BaseNetworkDeploy is DeployBaseImpl {
   /// @dev Set Base mainnet addresses and then call parent setup to pull env configs.
-  function setup() public override {
+  function setUp() public override {
     // ---- Base mainnet core addresses ----
     USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
     WETH = 0x4200000000000000000000000000000000000006;
@@ -31,7 +31,7 @@ contract BaseNetworkDeploy is DeployBaseImpl {
     _setAssetCometMapping(AERO, COMET_AERO);
 
     // Inherit env-driven actor configuration
-    super.setup();
+    super.setUp();
   }
 
   function run() public override {

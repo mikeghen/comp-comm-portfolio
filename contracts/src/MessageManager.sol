@@ -57,7 +57,8 @@ contract MessageManager is AccessControl, ReentrancyGuard, EIP712 {
   address public immutable DEV;
 
   /// @notice Message price: 10 USDC (6 decimals).
-  uint256 public constant MESSAGE_PRICE_USDC = 10_000_000;
+  /// TODO: Change back to 10 USDC for mainnet deployment.
+  uint256 public constant MESSAGE_PRICE_USDC = 1_000_000;
 
   /// @notice MT minted per message to user: 1.0 MT (18 decimals).
   uint256 public constant MT_PER_MESSAGE_USER = 1_000_000_000_000_000_000;

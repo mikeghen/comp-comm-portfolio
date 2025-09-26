@@ -675,7 +675,8 @@ contract PreviewEditCost is PolicyManagerTest {
   function test_CalculatesCostsForSpecificValues() public view {
     (uint256 costUSDC, uint256 userMint, uint256 devMint) = policyManager.previewEditCost(1);
 
-    assertEq(costUSDC, 1_000_000); // 1 USDC
+    // TODO: Change back to 1_000_000 (1 USDC) before mainnet deploy, lowered for testnet
+    assertEq(costUSDC, 100_000); // 0.1 USDC
     assertEq(userMint, 100_000_000_000_000_000); // 0.1 MT
     assertEq(devMint, 20_000_000_000_000_000); // 0.02 MT (20% of 0.1)
   }
@@ -683,7 +684,8 @@ contract PreviewEditCost is PolicyManagerTest {
   function test_CalculatesCostsForMultipleUnits() public view {
     (uint256 costUSDC, uint256 userMint, uint256 devMint) = policyManager.previewEditCost(5);
 
-    assertEq(costUSDC, 5_000_000); // 5 USDC
+    // TODO: Change back to 5_000_000 (5 USDC) before mainnet deploy, lowered for testnet
+    assertEq(costUSDC, 500_000); // 0.5 USDC
     assertEq(userMint, 500_000_000_000_000_000); // 0.5 MT
     assertEq(devMint, 100_000_000_000_000_000); // 0.1 MT (20% of 0.5)
   }
@@ -743,7 +745,8 @@ contract PromptVersion is PolicyManagerTest {
 
 contract Constants is PolicyManagerTest {
   function test_EditPricePer10CharsUSDC() public view {
-    assertEq(policyManager.EDIT_PRICE_PER_10_CHARS_USDC(), 1_000_000);
+    // TODO: Change back to 1_000_000 (1 USDC) before mainnet deploy, lowered for testnet
+    assertEq(policyManager.EDIT_PRICE_PER_10_CHARS_USDC(), 100_000);
   }
 
   function test_MtPer10charsUser() public view {

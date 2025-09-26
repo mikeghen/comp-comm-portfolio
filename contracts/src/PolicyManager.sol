@@ -38,8 +38,9 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
   /// @notice Dev share receiver address.
   address public immutable DEV;
 
-  /// @notice Edit price: 1 USDC per 10 characters (6 decimals).
-  uint256 public constant EDIT_PRICE_PER_10_CHARS_USDC = 1_000_000;
+  /// @notice Edit price: 0.1 USDC per 10 characters (6 decimals).
+  /// TODO: Change back to 1 USDC for mainnet deployment.
+  uint256 public constant EDIT_PRICE_PER_10_CHARS_USDC = 100_000;
 
   /// @notice MT minted per 10 characters: 0.1 MT (18 decimals).
   uint256 public constant MT_PER_10CHARS_USER = 100_000_000_000_000_000;

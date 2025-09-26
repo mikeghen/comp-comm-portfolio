@@ -343,7 +343,8 @@ contract MarkMessageProcessed is MessageManagerTest {
 
 contract Constants is MessageManagerTest {
   function test_MessagePrice() public view {
-    assertEq(messageManager.MESSAGE_PRICE_USDC(), 10_000_000);
+    // TODO: Change back to 10_000_000 (10 USDC) before mainnet deploy, lowered for testnet
+    assertEq(messageManager.MESSAGE_PRICE_USDC(), 1_000_000);
   }
 
   function test_MtPerMessageUser() public view {
