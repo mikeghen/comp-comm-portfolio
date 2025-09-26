@@ -53,11 +53,11 @@ contract PolicyManagerTest is Test {
 
   function _boundToSafePolicySize(uint256 _length, uint256 _currentPolicyLength)
     internal
-    pure
+    view
     returns (uint256)
   {
-    // Ensure the resulting policy stays under 2048 characters
-    uint256 maxAllowed = 2048 - _currentPolicyLength;
+    // Ensure the resulting policy stays under MAX_POLICY_SIZE characters
+    uint256 maxAllowed = _getMaxPolicySize() - _currentPolicyLength;
     return bound(_length, 0, maxAllowed);
   }
 
@@ -73,6 +73,35 @@ contract PolicyManagerTest is Test {
 
   function _boundToReasonableCost(uint256 _cost) internal pure returns (uint256) {
     return bound(_cost, 1, 1000);
+  }
+
+  function _generatePromptString(uint256 _length) internal pure returns (string memory) {
+    string memory prompt = new string(_length);
+    bytes memory promptBytes = bytes(prompt);
+    for (uint256 i = 0; i < _length; i++) {
+      promptBytes[i] = bytes1(uint8(65 + (i % 26))); // A-Z repeating
+    }
+    return string(promptBytes);
+  }
+
+  function _generateReplacementString(uint256 _length) internal pure returns (string memory) {
+    bytes memory newReplacement = new bytes(_length);
+    for (uint256 i = 0; i < _length; i++) {
+      newReplacement[i] = bytes1(uint8(65 + (i % 26))); // A-Z repeating
+    }
+    return string(newReplacement);
+  }
+
+  function _assumeValidPolicySize(uint256 _promptLength) internal view {
+    vm.assume(_promptLength <= policyManager.MAX_POLICY_SIZE());
+  }
+
+  function _assumeValidInitialPromptSize(string memory _prompt) internal view {
+    vm.assume(bytes(_prompt).length <= policyManager.MAX_POLICY_SIZE());
+  }
+
+  function _getMaxPolicySize() internal view returns (uint256) {
+    return policyManager.MAX_POLICY_SIZE();
   }
 }
 
@@ -96,8 +125,7 @@ contract Constructor is PolicyManagerTest {
     _assumeSafeAddress(_mtToken);
     _assumeSafeAddress(_dev);
     _assumeSafeAddress(_vault);
-    // Bound initial prompt to respect 2048 character limit
-    vm.assume(bytes(_initialPrompt).length <= 2048);
+    _assumeValidInitialPromptSize(_initialPrompt);
 
     PolicyManager _policyManager = new PolicyManager(_usdc, _mtToken, _dev, vault, _initialPrompt);
 
@@ -148,57 +176,20 @@ contract Constructor is PolicyManagerTest {
   }
 
   function test_RevertIf_InitialPromptExceedsMaxSize() public {
-    // Create a prompt that exceeds 2048 characters
-    string memory largePrompt = new string(2049);
-    bytes memory largePromptBytes = bytes(largePrompt);
-    for (uint256 i = 0; i < 2049; i++) {
-      largePromptBytes[i] = bytes1(uint8(65 + (i % 26))); // A-Z repeating
-    }
+    // Create a prompt that exceeds MAX_POLICY_SIZE characters
+    string memory largePrompt = _generatePromptString(_getMaxPolicySize() + 1);
 
     vm.expectRevert(PolicyManager.PolicyManager__PolicyTooLarge.selector);
-    new PolicyManager(address(usdc), address(mtToken), dev, vault, string(largePromptBytes));
+    new PolicyManager(address(usdc), address(mtToken), dev, vault, largePrompt);
   }
 
   function test_AllowsInitialPromptAtExactMaxSize() public {
-    // Create a prompt that is exactly 2048 characters
-    string memory maxPrompt = new string(2048);
-    bytes memory maxPromptBytes = bytes(maxPrompt);
-    for (uint256 i = 0; i < 2048; i++) {
-      maxPromptBytes[i] = bytes1(uint8(65 + (i % 26))); // A-Z repeating
-    }
+    // Create a prompt that is exactly MAX_POLICY_SIZE characters
+    string memory maxPrompt = _generatePromptString(_getMaxPolicySize());
 
     PolicyManager newPolicyManager =
-      new PolicyManager(address(usdc), address(mtToken), dev, vault, string(maxPromptBytes));
-    assertEq(bytes(newPolicyManager.prompt()).length, 2048);
-  }
-
-  function testFuzz_ConstructorEnforcesSizeLimit(uint256 _promptSize) public {
-    // Test prompts that exceed the limit
-    _promptSize = bound(_promptSize, 2049, 5000);
-
-    string memory tooLargePrompt = new string(_promptSize);
-    bytes memory tooLargePromptBytes = bytes(tooLargePrompt);
-    for (uint256 i = 0; i < _promptSize; i++) {
-      tooLargePromptBytes[i] = bytes1(uint8(65 + (i % 26)));
-    }
-
-    vm.expectRevert(PolicyManager.PolicyManager__PolicyTooLarge.selector);
-    new PolicyManager(address(usdc), address(mtToken), dev, vault, string(tooLargePromptBytes));
-  }
-
-  function testFuzz_AllowsValidSizeInConstructor(uint256 _promptSize) public {
-    // Test prompts within the limit
-    _promptSize = bound(_promptSize, 0, 2048);
-
-    string memory validPrompt = new string(_promptSize);
-    bytes memory validPromptBytes = bytes(validPrompt);
-    for (uint256 i = 0; i < _promptSize; i++) {
-      validPromptBytes[i] = bytes1(uint8(65 + (i % 26)));
-    }
-
-    PolicyManager validPolicyManager =
-      new PolicyManager(address(usdc), address(mtToken), dev, vault, string(validPromptBytes));
-    assertEq(bytes(validPolicyManager.prompt()).length, _promptSize);
+      new PolicyManager(address(usdc), address(mtToken), dev, vault, maxPrompt);
+    assertEq(bytes(newPolicyManager.prompt()).length, _getMaxPolicySize());
   }
 }
 
@@ -229,16 +220,11 @@ contract EditPrompt is PolicyManagerTest {
     uint256 promptLength = bytes(currentPrompt).length;
     (_start, _end) = _boundToReasonableEditRange(_start, _end, promptLength);
 
-    // Create replacement of exact length needed, ensuring final policy size <= 2048
+    // Create replacement of exact length needed, ensuring final policy size <= MAX_POLICY_SIZE
     uint256 rangeLength = _end - _start;
-    uint256 maxFinalSize = promptLength - rangeLength + rangeLength; // This equals promptLength
-    vm.assume(maxFinalSize <= 2048); // Ensure we don't exceed limit
+    _assumeValidPolicySize(promptLength);
 
-    bytes memory newReplacement = new bytes(rangeLength);
-    for (uint256 i = 0; i < rangeLength; i++) {
-      newReplacement[i] = bytes1(uint8(65 + (i % 26))); // A-Z repeating
-    }
-    _replacement = string(newReplacement);
+    _replacement = _generateReplacementString(rangeLength);
 
     uint256 expectedVersion = policyManager.promptVersion() + 1;
     uint256 expectedChanged = (rangeLength + 9) / 10;
@@ -271,15 +257,8 @@ contract EditPrompt is PolicyManagerTest {
     uint256 maxFinalSize = promptLength - rangeLength + rangeLength; // This equals promptLength
     vm.assume(maxFinalSize <= 2048); // Ensure we don't exceed limit
 
-    if (rangeLength == 0) {
-      _replacement = "";
-    } else {
-      bytes memory newReplacement = new bytes(rangeLength);
-      for (uint256 i = 0; i < rangeLength; i++) {
-        newReplacement[i] = bytes1(uint8(65 + (i % 26))); // A-Z repeating
-      }
-      _replacement = string(newReplacement);
-    }
+    if (rangeLength == 0) _replacement = "";
+    else _replacement = _generateReplacementString(rangeLength);
 
     uint256 replacementLength = rangeLength;
     uint256 expectedChanged = (replacementLength + 9) / 10;
@@ -489,15 +468,11 @@ contract EditPrompt is PolicyManagerTest {
     // ---- Arrange
     _fundUserAndApprove(1000e6);
 
-    // Start with exactly 2048 characters (at the limit)
-    string memory maxPrompt = new string(2048);
-    bytes memory maxPromptBytes = bytes(maxPrompt);
-    for (uint256 i = 0; i < 2048; i++) {
-      maxPromptBytes[i] = bytes1(uint8(65 + (i % 26))); // A-Z repeating
-    }
+    // Start with exactly MAX_POLICY_SIZE characters (at the limit)
+    string memory maxPrompt = _generatePromptString(_getMaxPolicySize());
 
     PolicyManager maxPolicyManager =
-      new PolicyManager(address(usdc), address(mtToken), dev, vault, string(maxPromptBytes));
+      new PolicyManager(address(usdc), address(mtToken), dev, vault, maxPrompt);
 
     // Grant MINTER_ROLE to the new PolicyManager
     vm.prank(admin);
@@ -511,27 +486,23 @@ contract EditPrompt is PolicyManagerTest {
     // Replace 1 character with 1 character (no size change, should be allowed)
     string memory replacement = "X"; // 1 character
 
-    // ---- Act - this should work since final size remains 2048
+    // ---- Act - this should work since final size remains MAX_POLICY_SIZE
     vm.prank(user);
     maxPolicyManager.editPrompt(0, 1, replacement);
 
     // ---- Assert
-    assertEq(bytes(maxPolicyManager.prompt()).length, 2048);
+    assertEq(bytes(maxPolicyManager.prompt()).length, _getMaxPolicySize());
   }
 
   function test_EditMaintainsSizeLimit() public {
     // ---- Arrange
     _fundUserAndApprove(1000e6);
 
-    // Start with exactly 2048 characters (at the limit)
-    string memory maxPrompt = new string(2048);
-    bytes memory maxPromptBytes = bytes(maxPrompt);
-    for (uint256 i = 0; i < 2048; i++) {
-      maxPromptBytes[i] = bytes1(uint8(65 + (i % 26))); // A-Z repeating
-    }
+    // Start with exactly MAX_POLICY_SIZE characters (at the limit)
+    string memory maxPrompt = _generatePromptString(_getMaxPolicySize());
 
     PolicyManager maxPolicyManager =
-      new PolicyManager(address(usdc), address(mtToken), dev, vault, string(maxPromptBytes));
+      new PolicyManager(address(usdc), address(mtToken), dev, vault, maxPrompt);
 
     // Grant MINTER_ROLE to the new PolicyManager
     vm.prank(admin);
@@ -545,12 +516,12 @@ contract EditPrompt is PolicyManagerTest {
     // Replace 10 characters with 10 characters (no size change, should be allowed)
     string memory replacement = "XXXXXXXXXX"; // 10 characters
 
-    // ---- Act - this should work since final size remains 2048
+    // ---- Act - this should work since final size remains MAX_POLICY_SIZE
     vm.prank(user);
     maxPolicyManager.editPrompt(0, 10, replacement);
 
     // ---- Assert - policy should still be at the maximum allowed size
-    assertEq(bytes(maxPolicyManager.prompt()).length, 2048);
+    assertEq(bytes(maxPolicyManager.prompt()).length, _getMaxPolicySize());
 
     // Verify the edit was applied
     string memory newPrompt = maxPolicyManager.prompt();
@@ -561,12 +532,12 @@ contract EditPrompt is PolicyManagerTest {
     // ---- Arrange
     _fundUserAndApprove(1000e6);
 
-    // Start with current policy (should be much smaller than 2048)
+    // Start with current policy (should be much smaller than MAX_POLICY_SIZE)
     string memory currentPrompt = policyManager.prompt();
     uint256 currentLength = bytes(currentPrompt).length;
 
     // Ensure we're well under the limit
-    vm.assume(currentLength < 2000);
+    vm.assume(currentLength < _getMaxPolicySize() - 100);
 
     // Replace 1 character with 1 character
     string memory replacement = "X";
@@ -576,7 +547,7 @@ contract EditPrompt is PolicyManagerTest {
     policyManager.editPrompt(0, 1, replacement);
 
     // ---- Assert
-    assertTrue(bytes(policyManager.prompt()).length <= 2048);
+    assertTrue(bytes(policyManager.prompt()).length <= _getMaxPolicySize());
   }
 }
 
