@@ -17,6 +17,9 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
   /// @notice Thrown when the replacement length doesn't match the range.
   error PolicyManager__InvalidReplacementLength();
 
+  /// @notice Thrown when the policy would exceed the maximum size limit.
+  error PolicyManager__PolicyTooLarge();
+
   /// @notice The investment policy stored as ASCII text.
   string public prompt;
 
@@ -43,6 +46,9 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
 
   /// @notice Dev share: 20% in basis points.
   uint256 public constant DEV_BPS = 2000;
+
+  /// @notice Maximum policy size in characters.
+  uint256 public constant MAX_POLICY_SIZE = 2048;
 
   /// @notice Role for minting MT tokens.
   // @note Who is minter?
@@ -85,6 +91,7 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
     if (_usdc == address(0)) revert PolicyManager__InvalidEditRange();
     if (_mtToken == address(0)) revert PolicyManager__InvalidEditRange();
     if (_dev == address(0)) revert PolicyManager__InvalidEditRange();
+    if (bytes(_initialPrompt).length > MAX_POLICY_SIZE) revert PolicyManager__PolicyTooLarge();
     VAULT = _vault;
     USDC = _usdc;
     MT_TOKEN = _mtToken;
@@ -200,10 +207,15 @@ contract PolicyManager is AccessControl, ReentrancyGuard {
     bytes memory p1 = LibBytes.slice(bytes(prompt), 0, start);
     // Copy the part after the edit
     bytes memory p2 = LibBytes.slice(bytes(prompt), end, promptBytes.length);
-    // Concatenate the edit to the fist part
+    // Concatenate the edit to the first part
     bytes memory temp = LibBytes.concat(p1, bytes(replacement));
-    // string(concat(concat(slice(bytes(prompt), 0, start), bytes(replacement)), p2));
 
-    prompt = string(LibBytes.concat(temp, p2));
+    // Calculate the new prompt
+    bytes memory newPrompt = LibBytes.concat(temp, p2);
+
+    // Check size limit
+    if (newPrompt.length > MAX_POLICY_SIZE) revert PolicyManager__PolicyTooLarge();
+
+    prompt = string(newPrompt);
   }
 }
