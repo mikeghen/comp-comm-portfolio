@@ -1,0 +1,193 @@
+[
+  {
+    "type": "constructor",
+    "inputs": [
+      {"name": "_usdc", "type": "address", "internalType": "address"},
+      {"name": "_mtToken", "type": "address", "internalType": "address"},
+      {"name": "_dev", "type": "address", "internalType": "address"},
+      {"name": "_agent", "type": "address", "internalType": "address"},
+      {"name": "_admin", "type": "address", "internalType": "address"},
+      {"name": "_vault", "type": "address", "internalType": "address"}
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "payForMessageWithSig",
+    "inputs": [
+      {
+        "name": "m",
+        "type": "tuple",
+        "internalType": "struct MessageManager.Message",
+        "components": [
+          {"name": "messageHash", "type": "bytes32", "internalType": "bytes32"},
+          {"name": "payer", "type": "address", "internalType": "address"},
+          {"name": "nonce", "type": "uint256", "internalType": "uint256"}
+        ]
+      },
+      {"name": "sig", "type": "bytes", "internalType": "bytes"},
+      {"name": "messageURI", "type": "string", "internalType": "string"}
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "markMessageProcessed",
+    "inputs": [
+      {"name": "sigHash", "type": "bytes32", "internalType": "bytes32"}
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "paidMessages",
+    "inputs": [
+      {"name": "digest", "type": "bytes32", "internalType": "bytes32"}
+    ],
+    "outputs": [
+      {"name": "paid", "type": "bool", "internalType": "bool"}
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "processedMessages",
+    "inputs": [
+      {"name": "digest", "type": "bytes32", "internalType": "bytes32"}
+    ],
+    "outputs": [
+      {"name": "processed", "type": "bool", "internalType": "bool"}
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "USDC",
+    "inputs": [],
+    "outputs": [
+      {"name": "", "type": "address", "internalType": "address"}
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MT_TOKEN",
+    "inputs": [],
+    "outputs": [
+      {"name": "", "type": "address", "internalType": "address"}
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "VAULT",
+    "inputs": [],
+    "outputs": [
+      {"name": "", "type": "address", "internalType": "address"}
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "DEV",
+    "inputs": [],
+    "outputs": [
+      {"name": "", "type": "address", "internalType": "address"}
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MESSAGE_PRICE_USDC",
+    "inputs": [],
+    "outputs": [
+      {"name": "", "type": "uint256", "internalType": "uint256"}
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MT_PER_MESSAGE_USER",
+    "inputs": [],
+    "outputs": [
+      {"name": "", "type": "uint256", "internalType": "uint256"}
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "DEV_BPS",
+    "inputs": [],
+    "outputs": [
+      {"name": "", "type": "uint256", "internalType": "uint256"}
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MESSAGE_TYPEHASH",
+    "inputs": [],
+    "outputs": [
+      {"name": "", "type": "bytes32", "internalType": "bytes32"}
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "exposed_DOMAIN_SEPARATOR",
+    "inputs": [],
+    "outputs": [
+      {"name": "", "type": "bytes32", "internalType": "bytes32"}
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "event",
+    "name": "MessagePaid",
+    "inputs": [
+      {"name": "sigHash", "type": "bytes32", "indexed": true, "internalType": "bytes32"},
+      {"name": "payer", "type": "address", "indexed": true, "internalType": "address"},
+      {"name": "messageURI", "type": "string", "indexed": false, "internalType": "string"},
+      {"name": "messageHash", "type": "bytes32", "indexed": false, "internalType": "bytes32"},
+      {"name": "userMint", "type": "uint256", "indexed": false, "internalType": "uint256"},
+      {"name": "devMint", "type": "uint256", "indexed": false, "internalType": "uint256"}
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "MessageProcessed",
+    "inputs": [
+      {"name": "sigHash", "type": "bytes32", "indexed": true, "internalType": "bytes32"},
+      {"name": "processor", "type": "address", "indexed": true, "internalType": "address"}
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "MessageManager__AlreadyPaid",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "MessageManager__AlreadyProcessed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "MessageManager__NotPaid",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "MessageManager__InvalidAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "MessageManager__InvalidSignature",
+    "inputs": []
+  }
+]
