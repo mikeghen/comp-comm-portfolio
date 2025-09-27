@@ -9,9 +9,10 @@ interface MessageInputProps {
   input: string;
   setInput: (value: string) => void;
   handleKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
-  sendMessage: () => void;
+  sendMessage: (options?: { skipClearInput?: boolean; skipUserMessage?: boolean }) => void;
   connectionStatus: 'connected' | 'connecting' | 'disconnected';
   isThinking: boolean;
+  addUserMessage: (content: string) => void;
 }
 
 function MessageInput({ 
@@ -20,7 +21,8 @@ function MessageInput({
   handleKeyDown, 
   sendMessage, 
   connectionStatus, 
-  isThinking 
+  isThinking,
+  addUserMessage 
 }: MessageInputProps) {
   const { address: userAddress, chainId } = useAccount();
   const [showToast, setShowToast] = useState(false);
@@ -103,8 +105,8 @@ function MessageInput({
       setToastMessage('Payment successful! The agent is now processing your message.');
       setToastVariant('success');
       setShowToast(true);
-      // Mirror previous UX: trigger sendMessage to add user msg + "Thinking..."
-      sendMessage();
+      // Now that payment is confirmed, add the thinking message (skip user message since already added)
+      sendMessage({ skipClearInput: true, skipUserMessage: true });
       // Refresh allowance so button state stays correct
       refetchAllowance();
       // Reset stored hash
@@ -144,13 +146,18 @@ function MessageInput({
   const handlePayForMessage = async () => {
     if (!userAddress || !chainId || !messageManagerAddress || !input.trim()) return;
 
+    // Immediately add user message to chat and clear input
+    const messageContent = input.trim();
+    addUserMessage(messageContent);
+    setInput('');
+
     try {
       // Call the simplified contract function
       const hash = await writePayMessageAsync({
         address: messageManagerAddress,
         abi: MESSAGE_MANAGER_ABI,
         functionName: 'payForMessage',
-        args: [input.trim()], // Just pass the message string directly
+        args: [messageContent], // Use the saved message content
       });
       // Track tx hash to await confirmation
       if (hash) setPayTxHash(hash as `0x${string}`);
@@ -163,7 +170,7 @@ function MessageInput({
 
   const getButtonContent = () => {
     if (!canShowIntegratedButton) {
-      return { text: 'Send', action: sendMessage, variant: 'success' as const };
+      return { text: 'Send', action: () => sendMessage(), variant: 'success' as const };
     }
 
     if (isLoadingApproval) {

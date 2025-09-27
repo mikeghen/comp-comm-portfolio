@@ -176,18 +176,28 @@ const App: React.FC = () => {
     }
   }, [messages]);
 
-  const sendMessage = async (): Promise<void> => {
-    if (!input.trim() || connectionStatus !== 'connected' || isThinking) return;
+  const sendMessage = async (options?: { skipClearInput?: boolean; skipUserMessage?: boolean }): Promise<void> => {
+    // If we're adding thinking message after payment confirmation, we don't need to check input
+    const shouldCheckInput = !options?.skipUserMessage;
+    if (shouldCheckInput && (!input.trim() || connectionStatus !== 'connected' || isThinking)) return;
 
-    // Add user message to UI
-    setMessages(prev => [...prev, { type: 'user', content: input }]);
+    // Add user message to UI (only if not skipping user message - i.e., normal send)
+    if (!options?.skipUserMessage) {
+      setMessages(prev => [...prev, { type: 'user', content: input }]);
+    }
 
-    // Add thinking message immediately (no signature flow)
+    // Add thinking message (this happens both in normal send and after payment confirmation)
     setMessages(prev => [...prev, { type: 'thinking', content: 'Thinking...' }]);
     setIsThinking(true);
 
-    // Clear input
-    setInput('');
+    // Clear input (unless explicitly skipped)
+    if (!options?.skipClearInput) {
+      setInput('');
+    }
+  };
+
+  const addUserMessage = (content: string): void => {
+    setMessages(prev => [...prev, { type: 'user', content }]);
   };
 
   // Handle key down events - prevent Enter from sending messages
@@ -217,6 +227,7 @@ const App: React.FC = () => {
               sendMessage={sendMessage}
               connectionStatus={connectionStatus}
               isThinking={isThinking}
+              addUserMessage={addUserMessage}
             />
           </Col>
           

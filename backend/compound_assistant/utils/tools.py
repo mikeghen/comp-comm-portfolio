@@ -49,10 +49,7 @@ def initialize_agentkit():
         wallet_provider=wallet_provider,
         action_providers=[
             compound_action_provider(), # Only supports supplying and withdrawing from allowed assets from Compound v3
-            erc20_action_provider(), # Only supports transferring ERC20 tokens
             uniswap_v3_action_provider(), # Only supports swapping between allowed assets
-            wallet_action_provider(), # Only supports transferring ETH
-            weth_action_provider(), # Only supports wrapping ETH to WETH
         ]
     ))
     

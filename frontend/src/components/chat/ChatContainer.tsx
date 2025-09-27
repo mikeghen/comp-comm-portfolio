@@ -15,9 +15,10 @@ interface ChatContainerProps {
   input: string;
   setInput: (value: string) => void;
   handleKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
-  sendMessage: () => void;
+  sendMessage: (options?: { skipClearInput?: boolean; skipUserMessage?: boolean }) => void;
   connectionStatus: 'connected' | 'connecting' | 'disconnected';
   isThinking: boolean;
+  addUserMessage: (content: string) => void;
 }
 
 function ChatContainer({ 
@@ -29,7 +30,8 @@ function ChatContainer({
   handleKeyDown,
   sendMessage,
   connectionStatus,
-  isThinking
+  isThinking,
+  addUserMessage
 }: ChatContainerProps) {
   return (
     <Card className="h-100 chat-card">
@@ -43,6 +45,7 @@ function ChatContainer({
             sendMessage={sendMessage}
             connectionStatus={connectionStatus}
             isThinking={isThinking}
+            addUserMessage={addUserMessage}
           />
         </>
       ) : (
