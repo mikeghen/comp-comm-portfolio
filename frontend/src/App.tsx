@@ -23,21 +23,48 @@ const App: React.FC = () => {
     }
   ]);
   const [input, setInput] = useState<string>('');
-  const [socket, setSocket] = useState<WebSocket | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'connecting' | 'disconnected'>('disconnected');
   const [isThinking, setIsThinking] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimerRef = useRef<number | null>(null);
   
   // Use wagmi's useAccount hook to check if wallet is connected
   const { isConnected } = useAccount();
 
   // Connect to WebSocket
   useEffect(() => {
-    if (!isConnected) return; // Only connect to WebSocket if wallet is connected
-    
-    const connectWebSocket = () => {
+    // If wallet disconnects, ensure cleanup
+    if (!isConnected) {
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      if (wsRef.current) {
+        try {
+          wsRef.current.onclose = null;
+          wsRef.current.close();
+        } catch (error) {
+          console.warn('Error closing WebSocket connection:', error);
+        }
+        wsRef.current = null;
+      }
+      setConnectionStatus('disconnected');
+      setIsThinking(false);
+      return;
+    }
+
+    let didUnmount = false;
+
+    const connect = () => {
+      // Avoid duplicate connection if already open or connecting
+      const existing = wsRef.current;
+      if (existing && (existing.readyState === WebSocket.OPEN || existing.readyState === WebSocket.CONNECTING)) {
+        return;
+      }
+
       setConnectionStatus('connecting');
-      
+
       // Use environment variable if available, otherwise calculate based on current URL
       let wsUrl: string;
       if (import.meta.env.VITE_WS_URL) {
@@ -46,14 +73,17 @@ const App: React.FC = () => {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         wsUrl = `${protocol}//${window.location.host}/ws/chat`;
       }
-      
+
       const ws = new WebSocket(wsUrl);
-      
+      wsRef.current = ws;
+
       ws.onopen = () => {
+        if (didUnmount) return;
         setConnectionStatus('connected');
       };
-      
+
       ws.onmessage = (event: MessageEvent) => {
+        if (didUnmount) return;
         const data = JSON.parse(event.data);
         
         if (data.type === 'agent') {
@@ -89,16 +119,23 @@ const App: React.FC = () => {
           setIsThinking(false);
         }
       };
-      
+
       ws.onclose = () => {
+        if (didUnmount) return;
         setConnectionStatus('disconnected');
         setIsThinking(false);
         
         // Try to reconnect after 3 seconds
-        setTimeout(connectWebSocket, 3000);
+        if (reconnectTimerRef.current) {
+          clearTimeout(reconnectTimerRef.current);
+        }
+        reconnectTimerRef.current = window.setTimeout(() => {
+          connect();
+        }, 3000);
       };
       
       ws.onerror = (error: Event) => {
+        if (didUnmount) return;
         console.error('WebSocket error:', error);
         setMessages(prev => {
           const filteredMessages = prev.filter(msg => msg.type !== 'thinking');
@@ -109,18 +146,27 @@ const App: React.FC = () => {
         });
         setIsThinking(false);
       };
-      
-      setSocket(ws);
-      
-      // Cleanup on unmount
-      return () => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.close();
-        }
-      };
     };
     
-    connectWebSocket();
+    connect();
+
+    return () => {
+      didUnmount = true;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      const ws = wsRef.current;
+      if (ws) {
+        try {
+          ws.onclose = null; // avoid reconnection on manual close
+          if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+            ws.close();
+          }
+        } catch {}
+        wsRef.current = null;
+      }
+    };
   }, [isConnected]); // Depend on isConnected to reconnect when wallet state changes
 
   // Scroll to bottom when messages update
