@@ -151,16 +151,16 @@ contract SepoliaDeployAndVerifyIntegration is Test {
     assertEq(mt.balanceOf(user), expectedUserMint);
     assertEq(mt.balanceOf(dev), expectedDevMint);
 
-    // ---- Act: pay for message via signature to mint more MT
-    (bytes32 digest, uint256 msgUserMint, uint256 msgDevMint, address payer) =
-      _payMessageAndExpected(0xFACEFEED);
+    // ---- Act: pay for message to mint more MT
+    (bytes32 messageHash, uint256 msgUserMint, uint256 msgDevMint, address payer) =
+      _payMessageAndExpected("Hello from Sepolia integration test");
     // ---- Assert: further MT minted to payer and dev
     assertEq(mt.balanceOf(payer), msgUserMint);
     assertEq(mt.balanceOf(dev), expectedDevMint + msgDevMint);
     // Agent marks message as processed
     vm.prank(agent);
-    msgMgr.markMessageProcessed(digest);
-    assertTrue(msgMgr.processedMessages(digest));
+    msgMgr.markMessageProcessed(messageHash);
+    assertTrue(msgMgr.processedMessages(messageHash));
 
     uint256 usdcBalance = IERC20(USDC).balanceOf(address(vault));
     vm.startPrank(agent);
@@ -401,26 +401,21 @@ contract SepoliaDeployAndVerifyIntegration is Test {
     expectedDevMint = (expectedUserMint * policy.DEV_BPS()) / 10_000;
   }
 
-  function _payMessageAndExpected(uint256 payerPk)
+  function _payMessageAndExpected(string memory message)
     internal
-    returns (bytes32 digest, uint256 msgUserMint, uint256 msgDevMint, address payer)
+    returns (bytes32 messageHash, uint256 msgUserMint, uint256 msgDevMint, address payer)
   {
-    payer = vm.addr(payerPk);
+    payer = makeAddr("MessagePayer");
+    messageHash = keccak256(abi.encodePacked(message));
+
     // fund and approve
     deal(USDC, payer, msgMgr.MESSAGE_PRICE_USDC());
     vm.prank(payer);
     IERC20(USDC).approve(address(msgMgr), type(uint256).max);
 
-    MessageManager.Message memory m =
-      MessageManager.Message({messageHash: keccak256("hello"), payer: payer, nonce: 1});
-    bytes32 structHash =
-      keccak256(abi.encode(msgMgr.MESSAGE_TYPEHASH(), m.messageHash, m.payer, m.nonce));
-    digest = keccak256(abi.encodePacked("\x19\x01", msgMgr.exposed_DOMAIN_SEPARATOR(), structHash));
-    (uint8 v, bytes32 r, bytes32 s) = vm.sign(payerPk, digest);
-    bytes memory sig = abi.encodePacked(r, s, v);
-
-    vm.prank(makeAddr("Relayer"));
-    msgMgr.payForMessageWithSig(m, sig, "ipfs://message");
+    // Pay for message directly
+    vm.prank(payer);
+    msgMgr.payForMessage(message);
 
     msgUserMint = msgMgr.MT_PER_MESSAGE_USER();
     msgDevMint = (msgUserMint * msgMgr.DEV_BPS()) / 10_000;

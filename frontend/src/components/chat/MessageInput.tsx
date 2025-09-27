@@ -1,13 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Button, Card, Spinner, Toast, ToastContainer } from 'react-bootstrap';
-import { useAccount, useWriteContract, useSignTypedData } from 'wagmi';
+import { useAccount, useWriteContract } from 'wagmi';
 import { useUSDCApproval } from '../../hooks/useUSDCApproval';
 import { ERC20_ABI, MESSAGE_MANAGER_ABI, getContractAddress } from '../../config/contracts';
-import { 
-  createMessageStruct, 
-  buildMessageManagerTypedData, 
-  MESSAGE_PRICE_USDC 
-} from '../../utils/messageManager';
+import { MESSAGE_PRICE_USDC } from '../../utils/messageManager';
 
 interface MessageInputProps {
   input: string;
@@ -57,8 +53,6 @@ function MessageInput({
     isError: isPayMessageError,
     error: payMessageError
   } = useWriteContract();
-  
-  const { signTypedData, isPending: isSignaturePending } = useSignTypedData();
 
   // Handle success and error states
   useEffect(() => {
@@ -99,7 +93,7 @@ function MessageInput({
 
   // Check if we can show the integrated send button
   const canShowIntegratedButton = userAddress && usdcAddress && messageManagerAddress && chainId;
-  const isAnyPending = isApprovalPending || isPayMessagePending || isSignaturePending;
+  const isAnyPending = isApprovalPending || isPayMessagePending;
 
   const handleApproveUSDC = async () => {
     if (!usdcAddress || !messageManagerAddress) return;
@@ -116,30 +110,21 @@ function MessageInput({
     }
   };
 
-  const handlePayAndSignMessage = async () => {
+  const handlePayForMessage = async () => {
     if (!userAddress || !chainId || !messageManagerAddress || !input.trim()) return;
 
     try {
-      // Create message struct
-      const messageStruct = createMessageStruct(input, userAddress);
-      
-      // Build EIP-712 typed data
-      const typedData = buildMessageManagerTypedData(messageStruct, chainId, messageManagerAddress);
-
-      // Sign the message
-      const signature = await signTypedData(typedData);
-
-      // Call the contract
+      // Call the simplified contract function
       await writePayMessage({
         address: messageManagerAddress,
         abi: MESSAGE_MANAGER_ABI,
-        functionName: 'payForMessageWithSig',
-        args: [messageStruct, signature, input], // messageURI is the original input
+        functionName: 'payForMessage',
+        args: [input.trim()], // Just pass the message string directly
       });
       
       // Success/error handling is done in useEffect hooks above
     } catch (error) {
-      console.error('Pay and sign failed:', error);
+      console.error('Pay for message failed:', error);
     }
   };
 
@@ -175,8 +160,8 @@ function MessageInput({
     }
 
     return { 
-      text: isAnyPending ? <><Spinner size="sm" /> Processing...</> : 'Pay and Sign Message', 
-      action: handlePayAndSignMessage, 
+      text: isAnyPending ? <><Spinner size="sm" /> Processing...</> : 'Pay and Send Message', 
+      action: handlePayForMessage, 
       variant: 'success' as const
     };
   };
@@ -236,4 +221,4 @@ function MessageInput({
   );
 }
 
-export default MessageInput; 
+export default MessageInput;

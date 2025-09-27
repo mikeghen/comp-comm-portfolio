@@ -13,20 +13,9 @@
   },
   {
     "type": "function",
-    "name": "payForMessageWithSig",
+    "name": "payForMessage",
     "inputs": [
-      {
-        "name": "m",
-        "type": "tuple",
-        "internalType": "struct MessageManager.Message",
-        "components": [
-          {"name": "messageHash", "type": "bytes32", "internalType": "bytes32"},
-          {"name": "payer", "type": "address", "internalType": "address"},
-          {"name": "nonce", "type": "uint256", "internalType": "uint256"}
-        ]
-      },
-      {"name": "sig", "type": "bytes", "internalType": "bytes"},
-      {"name": "messageURI", "type": "string", "internalType": "string"}
+      {"name": "message", "type": "string", "internalType": "string"}
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
@@ -35,7 +24,7 @@
     "type": "function",
     "name": "markMessageProcessed",
     "inputs": [
-      {"name": "sigHash", "type": "bytes32", "internalType": "bytes32"}
+      {"name": "messageHash", "type": "bytes32", "internalType": "bytes32"}
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
@@ -44,10 +33,10 @@
     "type": "function",
     "name": "paidMessages",
     "inputs": [
-      {"name": "digest", "type": "bytes32", "internalType": "bytes32"}
+      {"name": "messageHash", "type": "bytes32", "internalType": "bytes32"}
     ],
     "outputs": [
-      {"name": "paid", "type": "bool", "internalType": "bool"}
+      {"name": "message", "type": "string", "internalType": "string"}
     ],
     "stateMutability": "view"
   },
@@ -55,7 +44,7 @@
     "type": "function",
     "name": "processedMessages",
     "inputs": [
-      {"name": "digest", "type": "bytes32", "internalType": "bytes32"}
+      {"name": "messageHash", "type": "bytes32", "internalType": "bytes32"}
     ],
     "outputs": [
       {"name": "processed", "type": "bool", "internalType": "bool"}
@@ -127,7 +116,7 @@
   },
   {
     "type": "function",
-    "name": "MESSAGE_TYPEHASH",
+    "name": "AGENT_ROLE",
     "inputs": [],
     "outputs": [
       {"name": "", "type": "bytes32", "internalType": "bytes32"}
@@ -136,7 +125,7 @@
   },
   {
     "type": "function",
-    "name": "exposed_DOMAIN_SEPARATOR",
+    "name": "DEFAULT_ADMIN_ROLE",
     "inputs": [],
     "outputs": [
       {"name": "", "type": "bytes32", "internalType": "bytes32"}
@@ -144,13 +133,23 @@
     "stateMutability": "view"
   },
   {
+    "type": "function",
+    "name": "hasRole",
+    "inputs": [
+      {"name": "role", "type": "bytes32", "internalType": "bytes32"},
+      {"name": "account", "type": "address", "internalType": "address"}
+    ],
+    "outputs": [
+      {"name": "", "type": "bool", "internalType": "bool"}
+    ],
+    "stateMutability": "view"
+  },
+  {
     "type": "event",
     "name": "MessagePaid",
     "inputs": [
-      {"name": "sigHash", "type": "bytes32", "indexed": true, "internalType": "bytes32"},
+      {"name": "messageHash", "type": "bytes32", "indexed": true, "internalType": "bytes32"},
       {"name": "payer", "type": "address", "indexed": true, "internalType": "address"},
-      {"name": "messageURI", "type": "string", "indexed": false, "internalType": "string"},
-      {"name": "messageHash", "type": "bytes32", "indexed": false, "internalType": "bytes32"},
       {"name": "userMint", "type": "uint256", "indexed": false, "internalType": "uint256"},
       {"name": "devMint", "type": "uint256", "indexed": false, "internalType": "uint256"}
     ],
@@ -160,7 +159,7 @@
     "type": "event",
     "name": "MessageProcessed",
     "inputs": [
-      {"name": "sigHash", "type": "bytes32", "indexed": true, "internalType": "bytes32"},
+      {"name": "messageHash", "type": "bytes32", "indexed": true, "internalType": "bytes32"},
       {"name": "processor", "type": "address", "indexed": true, "internalType": "address"}
     ],
     "anonymous": false
@@ -183,11 +182,6 @@
   {
     "type": "error",
     "name": "MessageManager__InvalidAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "MessageManager__InvalidSignature",
     "inputs": []
   }
 ]
