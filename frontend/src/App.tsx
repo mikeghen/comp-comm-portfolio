@@ -44,7 +44,9 @@ const App: React.FC = () => {
         try {
           wsRef.current.onclose = null;
           wsRef.current.close();
-        } catch {}
+        } catch (error) {
+          console.warn('Error closing WebSocket connection:', error);
+        }
         wsRef.current = null;
       }
       setConnectionStatus('disconnected');
