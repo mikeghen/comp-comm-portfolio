@@ -91,7 +91,7 @@ class EventListener:
         try:
             # Extract event data (ensure 0x-prefixed hex string)
             raw_hash = event['args']['messageHash']
-            message_hash = Web3.to_hex(raw_hash) if isinstance(raw_hash, (bytes, bytearray)) else (raw_hash if str(raw_hash).startswith("0x") else f"0x{raw_hash}")
+            message_hash = Web3.to_hex(raw_hash)
             payer = event['args']['payer']
             user_mint = event['args']['userMint']
             dev_mint = event['args']['devMint']
