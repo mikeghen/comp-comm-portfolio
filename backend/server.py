@@ -4,6 +4,7 @@ import os
 import sys
 import json
 import logging
+import asyncio
 from typing import List, Dict, Any
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +16,9 @@ from eth_account.messages import encode_defunct
 from web3 import Web3
 
 from compound_assistant import create_agent
+from compound_assistant.blockchain import Web3Client, EventListener
+from compound_assistant.event_handlers import MessageEventHandler
+from compound_assistant.config.blockchain import BlockchainConfig
 
 # Configure logging to show print statements and debug info
 logging.basicConfig(
@@ -54,7 +58,34 @@ print("✅ Agent created successfully!")
 # Thread ID for persistence
 THREAD_ID = "Compound Assistant"
 
-# Initialize Web3 for signature verification
+# Initialize blockchain components
+print("🔗 Initializing blockchain connections...")
+
+# Validate blockchain configuration
+if not BlockchainConfig.validate_config():
+    print("❌ Blockchain configuration is invalid!")
+    BlockchainConfig.print_config_requirements()
+    sys.exit(1)
+
+# Initialize Web3 client
+try:
+    web3_client = Web3Client(BlockchainConfig.get_rpc_url())
+    print("✅ Web3 client initialized successfully!")
+except Exception as e:
+    print(f"❌ Failed to initialize Web3 client: {e}")
+    BlockchainConfig.print_config_requirements()
+    sys.exit(1)
+
+# Initialize event listener
+try:
+    contract_address = BlockchainConfig.get_message_manager_address()
+    event_listener = EventListener(web3_client.get_web3(), contract_address)
+    print(f"✅ Event listener initialized for contract: {contract_address}")
+except Exception as e:
+    print(f"❌ Failed to initialize event listener: {e}")
+    sys.exit(1)
+
+# Initialize Web3 for legacy signature verification (keeping for backward compatibility)
 w3 = Web3()
 
 # Define message model
@@ -76,14 +107,29 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
+        try:
+            print(f"🔌 Active WebSocket connections: {len(self.active_connections)}")
+        except Exception:
+            pass
 
     def disconnect(self, websocket: WebSocket):
         self.active_connections.remove(websocket)
+        try:
+            print(f"🔌 Active WebSocket connections: {len(self.active_connections)}")
+        except Exception:
+            pass
 
     async def send_message(self, message: str, websocket: WebSocket):
         await websocket.send_text(message)
 
 manager = ConnectionManager()
+
+# Initialize message event handler
+message_handler = MessageEventHandler(agent, event_listener, manager)
+event_listener.add_event_handler("MessagePaid", message_handler.handle_message_paid_event)
+
+# Global variable to track if blockchain listener is running
+blockchain_listener_task = None
 
 def verify_signature(message: str, signature: str, address: str) -> bool:
     """Verify that the signature was created by the provided address."""
@@ -108,106 +154,122 @@ def verify_signature(message: str, signature: str, address: str) -> bool:
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     print("💬 New WebSocket connection established")
+    
+    # Start blockchain listener if not already running
+    global blockchain_listener_task
+    if blockchain_listener_task is None or blockchain_listener_task.done():
+        print("🎧 Starting blockchain event listener...")
+        blockchain_listener_task = asyncio.create_task(
+            event_listener.start_listening(BlockchainConfig.get_event_poll_interval())
+        )
+        print("✅ Blockchain event listener started")
+    
     try:
+        # Send welcome message
+        welcome_message = {
+            "type": "system",
+            "content": "🔗 Connected to Compound Assistant. Listening for blockchain events..."
+        }
+        await manager.send_message(json.dumps(welcome_message), websocket)
+        
+        # Keep connection alive and handle any client messages
         while True:
-            # Receive message from client
-            data = await websocket.receive_text()
-            data = json.loads(data)
-            user_message = data.get("message", "")
-            signature = data.get("signature", "")
-            address = data.get("address", "")
-            
-            print(f"📩 Received message from {address[:8]}...{address[-6:] if address else 'unknown'}: {user_message[:50]}{'...' if len(user_message) > 50 else ''}")
-            
-            if not user_message:
-                continue
-            
-            # Verify signature if provided
-            if signature and address:
-                is_valid = verify_signature(user_message, signature, address)
-                if not is_valid:
+            try:
+                # Wait for messages with a timeout to allow for periodic checks
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=10.0)
+                
+                # Parse client message
+                try:
+                    message_data = json.loads(data)
+                    message_type = message_data.get("type", "")
+                    
+                    if message_type == "ping":
+                        # Respond to ping with pong
+                        pong_response = {
+                            "type": "pong",
+                            "timestamp": message_data.get("timestamp")
+                        }
+                        await manager.send_message(json.dumps(pong_response), websocket)
+                    
+                    elif message_type == "status":
+                        # Send status information
+                        status_response = {
+                            "type": "status",
+                            "blockchain_connected": web3_client.is_connected(),
+                            "event_listener_active": blockchain_listener_task and not blockchain_listener_task.done(),
+                            "contract_address": contract_address,
+                            "current_block": web3_client.get_web3().eth.block_number if web3_client.is_connected() else None
+                        }
+                        await manager.send_message(json.dumps(status_response), websocket)
+                    
+                    else:
+                        # For other message types, send info about blockchain-only processing
+                        info_response = {
+                            "type": "info",
+                            "content": "This assistant now processes messages from blockchain events only. "
+                                     "To interact with the assistant, please pay for a message using the MessageManager contract."
+                        }
+                        await manager.send_message(json.dumps(info_response), websocket)
+                        
+                except json.JSONDecodeError:
                     error_response = {
                         "type": "error",
-                        "content": "Signature verification failed. Please ensure you're using the correct wallet."
+                        "content": "Invalid JSON message format"
                     }
                     await manager.send_message(json.dumps(error_response), websocket)
-                    continue
-            else:
-                # If signature or address is missing, return error
-                error_response = {
-                    "type": "error",
-                    "content": "Message must be signed with your wallet."
-                }
-                await manager.send_message(json.dumps(error_response), websocket)
+                    
+            except asyncio.TimeoutError:
+                # Timeout is normal, just continue the loop
                 continue
-                
-            # Create config with thread ID for persistence
-            config = {"configurable": {"thread_id": THREAD_ID}}
-            
-            # Process message with agent
-            for chunk in agent.stream(
-                {"messages": [HumanMessage(content=user_message)]}, 
-                config
-            ):
-                if "agent" in chunk:
-                    # First, check if there are tool_calls in the agent response
-                    agent_message = chunk["agent"]["messages"][0]
-                    tool_calls = agent_message.additional_kwargs.get("tool_calls", [])
-                    
-                    # If there are tool calls, send them to the client
-                    if tool_calls:
-                        for tool_call in tool_calls:
-                            tool_type = tool_call.get("function", {}).get("name", "Unknown tool")
-                            
-                            # Extract arguments - could be a string or JSON
-                            args = tool_call.get("function", {}).get("arguments", "{}")
-                            try:
-                                # Try to parse JSON arguments
-                                args_dict = json.loads(args)
-                                # For python_interpreter, we're interested in __arg1
-                                if "__arg1" in args_dict:
-                                    content = args_dict["__arg1"]
-                                else:
-                                    content = json.dumps(args_dict, indent=2)
-                            except:
-                                # If not JSON, use as is
-                                content = args
-                            
-                            response = {
-                                "type": "tool_call",
-                                "tool": tool_type,
-                                "content": content
-                            }
-                            await manager.send_message(json.dumps(response), websocket)
-                    
-                    # If there's actual content in the agent message, send it
-                    if agent_message.content:
-                        response = {
-                            "type": "agent",
-                            "content": agent_message.content
-                        }
-                        await manager.send_message(json.dumps(response), websocket)
-                
-                elif "tools" in chunk:
-                    response = {
-                        "type": "tool",
-                        "content": chunk["tools"]["messages"][0].content
-                    }
-                    await manager.send_message(json.dumps(response), websocket)
+            except WebSocketDisconnect:
+                break
+            except Exception as e:
+                logger.error(f"Error handling WebSocket message: {e}")
+                break
     
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        pass
     except Exception as e:
+        logger.error(f"WebSocket error: {e}")
         error_response = {
             "type": "error",
             "content": f"An error occurred: {str(e)}"
         }
-        await manager.send_message(json.dumps(error_response), websocket)
+        try:
+            await manager.send_message(json.dumps(error_response), websocket)
+        except:
+            pass  # WebSocket might already be closed
+    finally:
         manager.disconnect(websocket)
+        print("💔 WebSocket connection closed")
+
+# Cleanup handler for graceful shutdown
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Handle graceful shutdown of the application."""
+    global blockchain_listener_task
+    
+    print("🛑 Shutting down Compound Assistant server...")
+    
+    # Stop blockchain event listener
+    if blockchain_listener_task and not blockchain_listener_task.done():
+        print("🔇 Stopping blockchain event listener...")
+        event_listener.stop_listening()
+        try:
+            await asyncio.wait_for(blockchain_listener_task, timeout=5.0)
+            print("✅ Blockchain event listener stopped")
+        except asyncio.TimeoutError:
+            print("⚠️ Blockchain event listener shutdown timeout")
+            blockchain_listener_task.cancel()
+    
+    print("👋 Compound Assistant server shutdown complete")
 
 if __name__ == "__main__":
     import uvicorn
     print("🌐 Starting server on http://0.0.0.0:8000")
+    print("📝 Server will listen for MessagePaid events from the blockchain")
+    print(f"📋 Contract Address: {contract_address}")
+    print(f"🔗 RPC URL: {BlockchainConfig.get_rpc_url()}")
     print("📝 Print statements and debug output should now be visible!")
     
     # Configure uvicorn to show all output and disable buffering
