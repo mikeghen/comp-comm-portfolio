@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useAccount, useSignMessage } from 'wagmi';
+import { useAccount } from 'wagmi';
 import { Container, Row, Col } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './bootstrap-overrides.css';
@@ -29,8 +29,7 @@ const App: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Use wagmi's useAccount hook to check if wallet is connected
-  const { address, isConnected } = useAccount();
-  const { signMessageAsync } = useSignMessage();
+  const { isConnected } = useAccount();
 
   // Connect to WebSocket
   useEffect(() => {
@@ -132,47 +131,17 @@ const App: React.FC = () => {
   }, [messages]);
 
   const sendMessage = async (): Promise<void> => {
-    if (!input.trim() || connectionStatus !== 'connected' || isThinking || !socket) return;
-    
+    if (!input.trim() || connectionStatus !== 'connected' || isThinking) return;
+
     // Add user message to UI
     setMessages(prev => [...prev, { type: 'user', content: input }]);
-    
-    // Add signature pending message
-    setMessages(prev => [...prev, { type: 'signature_pending', content: 'Waiting for signature...' }]);
-    
-    try {
-      // Sign the message with the connected wallet
-      const signature = await signMessageAsync({ message: input });
-      
-      // Remove signature pending message and add thinking message
-      setMessages(prev => {
-        const filteredMessages = prev.filter(msg => msg.type !== 'signature_pending');
-        return [...filteredMessages, { type: 'thinking', content: 'Thinking...' }];
-      });
-      
-      // Set thinking state after signature is obtained
-      setIsThinking(true);
-      
-      // Send signed message to server
-      socket.send(JSON.stringify({ 
-        message: input,
-        signature: signature,
-        address: address
-      }));
-      
-      // Clear input
-      setInput('');
-    } catch (error) {
-      console.error('Error signing message:', error);
-      setMessages(prev => {
-        // Remove signature pending message
-        const filteredMessages = prev.filter(msg => msg.type !== 'signature_pending');
-        return [...filteredMessages, { 
-          type: 'error', 
-          content: 'Failed to sign message. Please try again.' 
-        }];
-      });
-    }
+
+    // Add thinking message immediately (no signature flow)
+    setMessages(prev => [...prev, { type: 'thinking', content: 'Thinking...' }]);
+    setIsThinking(true);
+
+    // Clear input
+    setInput('');
   };
 
   // Update the handleKeyDown to be async

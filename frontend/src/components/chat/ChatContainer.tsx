@@ -3,6 +3,23 @@ import { Card } from 'react-bootstrap';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 
+interface Message {
+  type: 'agent' | 'user' | 'thinking' | 'tool' | 'tool_call' | 'error' | 'signature_pending';
+  content: string;
+}
+
+interface ChatContainerProps {
+  isConnected: boolean;
+  messages: Message[];
+  messagesEndRef: React.RefObject<HTMLDivElement>;
+  input: string;
+  setInput: (value: string) => void;
+  handleKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  sendMessage: () => void;
+  connectionStatus: 'connected' | 'connecting' | 'disconnected';
+  isThinking: boolean;
+}
+
 function ChatContainer({ 
   isConnected, 
   messages, 
@@ -13,7 +30,7 @@ function ChatContainer({
   sendMessage,
   connectionStatus,
   isThinking
-}) {
+}: ChatContainerProps) {
   return (
     <Card className="h-100 chat-card">
       {isConnected ? (

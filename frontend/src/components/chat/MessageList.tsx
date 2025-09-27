@@ -1,7 +1,17 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 
-function MessageList({ messages, messagesEndRef }) {
+interface Message {
+  type: 'agent' | 'user' | 'thinking' | 'tool' | 'tool_call' | 'error' | 'signature_pending';
+  content: string;
+}
+
+interface MessageListProps {
+  messages: Message[];
+  messagesEndRef: React.RefObject<HTMLDivElement>;
+}
+
+function MessageList({ messages, messagesEndRef }: MessageListProps) {
   return (
     <div className="chat-messages p-3 overflow-auto d-flex flex-column">
       {messages.map((message, index) => {

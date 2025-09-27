@@ -3,16 +3,13 @@ pragma solidity 0.8.28;
 
 import {AccessControl} from "openzeppelin/access/AccessControl.sol";
 import {ReentrancyGuard} from "openzeppelin/utils/ReentrancyGuard.sol";
-import {EIP712} from "openzeppelin/utils/cryptography/EIP712.sol";
-import {ECDSA} from "openzeppelin/utils/cryptography/ECDSA.sol";
-import {SignatureChecker} from "openzeppelin/utils/cryptography/SignatureChecker.sol";
 import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
 import {ManagementToken} from "./ManagementToken.sol";
 
 /// @title MessageManager
 /// @notice Handles USDC payments for AI agent messages and MT minting with replay protection.
-///@dev Uses AccessControl for agent permissions and EIP-712 for auth .
-contract MessageManager is AccessControl, ReentrancyGuard, EIP712 {
+/// @dev Uses AccessControl for agent permissions.
+contract MessageManager is AccessControl, ReentrancyGuard {
   /// @notice Thrown when a message has already been paid.
   error MessageManager__AlreadyPaid();
 
@@ -25,24 +22,14 @@ contract MessageManager is AccessControl, ReentrancyGuard, EIP712 {
   /// @notice Thrown when an invalid constructor address is provided.
   error MessageManager__InvalidAddress();
 
-  /// @notice Thrown when the provided signature is invalid for the payer and message.
-  error MessageManager__InvalidSignature();
-
   /// @notice Role for agent that can mark messages as processed.
   bytes32 public constant AGENT_ROLE = keccak256("AGENT_ROLE");
 
-  /// @notice Message typed data for EIP-712 signing.
-  struct Message {
-    bytes32 messageHash;
-    address payer;
-    uint256 nonce;
-  }
+  /// @notice Mapping of message hash to message content and payment status.
+  mapping(bytes32 messageHash => string message) public paidMessages;
 
-  /// @notice Mapping of EIP-712 message digest to payment status.
-  mapping(bytes32 digest => bool paid) public paidMessages;
-
-  /// @notice Mapping of EIP-712 message digest to processed status.
-  mapping(bytes32 digest => bool processed) public processedMessages;
+  /// @notice Mapping of message hash to processed status.
+  mapping(bytes32 messageHash => bool processed) public processedMessages;
 
   /// @notice USDC token address.
   address public immutable USDC;
@@ -66,30 +53,19 @@ contract MessageManager is AccessControl, ReentrancyGuard, EIP712 {
   /// @notice Dev share in basis points: 20%.
   uint256 public constant DEV_BPS = 2000;
 
-  /// @notice EIP-712 typehash for Message struct.
-  bytes32 public constant MESSAGE_TYPEHASH =
-    keccak256("Message(bytes32 messageHash,address payer,uint256 nonce)");
-
   /// @notice Emitted when a message is paid.
-  /// @param sigHash The EIP-712 digest for the message (named for backwards compatibility).
+  /// @param messageHash The keccak256 hash of the message content.
   /// @param payer The address paying for the message.
-  /// @param messageURI A human-readable URI/pointer to the message content.
-  /// @param messageHash The keccak256 hash of the off-chain message content.
   /// @param userMint Amount of MT minted to the payer.
   /// @param devMint Amount of MT minted to the dev address.
   event MessagePaid(
-    bytes32 indexed sigHash,
-    address indexed payer,
-    string messageURI,
-    bytes32 messageHash,
-    uint256 userMint,
-    uint256 devMint
+    bytes32 indexed messageHash, address indexed payer, uint256 userMint, uint256 devMint
   );
 
   /// @notice Emitted when a message is processed by the agent.
-  /// @param sigHash The EIP-712 digest for the previously paid message (name preserved).
+  /// @param messageHash The keccak256 hash of the processed message.
   /// @param processor The address that processed the message (must have AGENT_ROLE).
-  event MessageProcessed(bytes32 indexed sigHash, address indexed processor);
+  event MessageProcessed(bytes32 indexed messageHash, address indexed processor);
 
   /// @notice Initializes the MessageManager.
   /// @param _usdc USDC token address.
@@ -104,7 +80,7 @@ contract MessageManager is AccessControl, ReentrancyGuard, EIP712 {
     address _agent,
     address _admin,
     address _vault
-  ) EIP712("MessageManager", "1") {
+  ) {
     if (
       _usdc == address(0) || _mtToken == address(0) || _dev == address(0) || _agent == address(0)
         || _admin == address(0) || _vault == address(0)
@@ -118,54 +94,39 @@ contract MessageManager is AccessControl, ReentrancyGuard, EIP712 {
     _grantRole(AGENT_ROLE, _agent);
   }
 
-  /// @notice Pays for a message using an EIP-712 signature and mints MT to user and dev.
-  /// @param m The message payload including content hash, payer, and nonce.
-  /// @param sig The EIP-712/EIP-1271 signature authorizing this message payment.
-  /// @param messageURI A human-readable URI/pointer to the message content for off-chain indexing.
-  function payForMessageWithSig(Message calldata m, bytes calldata sig, string calldata messageURI)
-    external
-    nonReentrant
-  {
-    // Compute EIP-712 digest
-    bytes32 structHash = keccak256(abi.encode(MESSAGE_TYPEHASH, m.messageHash, m.payer, m.nonce));
-    bytes32 digest = _hashTypedDataV4(structHash);
+  /// @notice Pays for a message and mints MT to user and dev.
+  /// @param message The message content to pay for.
+  function payForMessage(string calldata message) external nonReentrant {
+    // Compute message hash
+    bytes32 messageHash = keccak256(abi.encodePacked(message));
 
-    // Use digest as replay key (robust to signature malleability variations like EIP-2098)
-    if (paidMessages[digest]) revert MessageManager__AlreadyPaid();
+    // Check if message has already been paid for
+    if (bytes(paidMessages[messageHash]).length > 0) revert MessageManager__AlreadyPaid();
 
-    // Validate signature from payer (EOA or ERC1271)
-    bool isValid = SignatureChecker.isValidSignatureNow(m.payer, digest, sig);
-    if (!isValid) revert MessageManager__InvalidSignature();
+    // Store message content with hash as key
+    paidMessages[messageHash] = message;
 
-    // Mark paid before external calls (reentrancy safety)
-    paidMessages[digest] = true;
-
-    // Transfer fixed USDC price from payer to this contract
-    IERC20(USDC).transferFrom(m.payer, VAULT, MESSAGE_PRICE_USDC);
+    // Transfer fixed USDC price from payer to vault
+    IERC20(USDC).transferFrom(msg.sender, VAULT, MESSAGE_PRICE_USDC);
 
     // Compute mint amounts
     uint256 userMint = MT_PER_MESSAGE_USER;
     uint256 devMint = (userMint * DEV_BPS) / 10_000;
 
     // Mint tokens
-    ManagementToken(MT_TOKEN).mint(m.payer, userMint);
+    ManagementToken(MT_TOKEN).mint(msg.sender, userMint);
     ManagementToken(MT_TOKEN).mint(DEV, devMint);
 
-    emit MessagePaid(digest, m.payer, messageURI, m.messageHash, userMint, devMint);
+    emit MessagePaid(messageHash, msg.sender, userMint, devMint);
   }
 
   /// @notice Marks a previously paid message as processed. Only callable by agent role.
-  /// @param sigHash The EIP-712 digest used when paying for the message (name preserved).
-  function markMessageProcessed(bytes32 sigHash) external onlyRole(AGENT_ROLE) {
-    if (!paidMessages[sigHash]) revert MessageManager__NotPaid();
-    if (processedMessages[sigHash]) revert MessageManager__AlreadyProcessed();
+  /// @param messageHash The keccak256 hash of the message to mark as processed.
+  function markMessageProcessed(bytes32 messageHash) external onlyRole(AGENT_ROLE) {
+    if (bytes(paidMessages[messageHash]).length == 0) revert MessageManager__NotPaid();
+    if (processedMessages[messageHash]) revert MessageManager__AlreadyProcessed();
 
-    processedMessages[sigHash] = true;
-    emit MessageProcessed(sigHash, msg.sender);
-  }
-
-  /// @notice Returns the EIP-712 domain separator (exposed for testing).
-  function exposed_DOMAIN_SEPARATOR() external view returns (bytes32) {
-    return _domainSeparatorV4();
+    processedMessages[messageHash] = true;
+    emit MessageProcessed(messageHash, msg.sender);
   }
 }

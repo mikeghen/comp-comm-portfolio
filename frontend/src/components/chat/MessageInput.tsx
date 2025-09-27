@@ -1,5 +1,18 @@
-import React from 'react';
-import { Form, Button, Card } from 'react-bootstrap';
+import React, { useState, useEffect } from 'react';
+import { Form, Button, Card, Spinner, Toast, ToastContainer } from 'react-bootstrap';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useUSDCApproval } from '../../hooks/useUSDCApproval';
+import { ERC20_ABI, MESSAGE_MANAGER_ABI, getContractAddress } from '../../config/contracts';
+import { MESSAGE_PRICE_USDC } from '../../utils/messageManager';
+
+interface MessageInputProps {
+  input: string;
+  setInput: (value: string) => void;
+  handleKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  sendMessage: () => void;
+  connectionStatus: 'connected' | 'connecting' | 'disconnected';
+  isThinking: boolean;
+}
 
 function MessageInput({ 
   input, 
@@ -8,7 +21,170 @@ function MessageInput({
   sendMessage, 
   connectionStatus, 
   isThinking 
-}) {
+}: MessageInputProps) {
+  const { address: userAddress, chainId } = useAccount();
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastVariant, setToastVariant] = useState<'success' | 'danger'>('success');
+  const [payTxHash, setPayTxHash] = useState<`0x${string}` | undefined>(undefined);
+  
+  // Get USDC approval status
+  const { 
+    hasApproval, 
+    hasSufficientBalance, 
+    isLoading: isLoadingApproval,
+    usdcAddress,
+    messageManagerAddress,
+    refetchAllowance 
+  } = useUSDCApproval();
+
+  // Contract write hooks
+  const { 
+    writeContract: writeApproval, 
+    isPending: isApprovalPending,
+    isSuccess: isApprovalSuccess,
+    isError: isApprovalError,
+    error: approvalError
+  } = useWriteContract();
+  
+  const { 
+    writeContract: writePayMessage,
+    writeContractAsync: writePayMessageAsync,
+    isPending: isPayMessagePending,
+    isSuccess: isPayMessageSuccess,
+    isError: isPayMessageError,
+    error: payMessageError
+  } = useWriteContract();
+
+  // Wait for payForMessage tx confirmation
+  const {
+    isLoading: isPayTxConfirming,
+    isSuccess: isPayTxConfirmed,
+  } = useWaitForTransactionReceipt({ hash: payTxHash });
+
+  // Handle success and error states
+  useEffect(() => {
+    if (isApprovalSuccess) {
+      setToastMessage('USDC approval successful!');
+      setToastVariant('success');
+      setShowToast(true);
+      // Refetch allowance to update button state
+      refetchAllowance();
+    }
+  }, [isApprovalSuccess, refetchAllowance]);
+
+  useEffect(() => {
+    if (isApprovalError) {
+      setToastMessage('Approval failed. Please try again.');
+      setToastVariant('danger');
+      setShowToast(true);
+    }
+  }, [isApprovalError, approvalError]);
+
+  useEffect(() => {
+    if (isPayTxConfirmed) {
+      setToastMessage('Payment successful! The agent is now processing your message.');
+      setToastVariant('success');
+      setShowToast(true);
+      // Mirror previous UX: trigger sendMessage to add user msg + "Thinking..."
+      sendMessage();
+      // Refresh allowance so button state stays correct
+      refetchAllowance();
+      // Reset stored hash
+      setPayTxHash(undefined);
+    }
+  }, [isPayTxConfirmed, sendMessage, refetchAllowance]);
+
+  useEffect(() => {
+    if (isPayMessageError) {
+      setToastMessage('Payment failed.');
+      setToastVariant('danger');
+      setShowToast(true);
+    }
+  }, [isPayMessageError, payMessageError]);
+
+  // Check if we can show the integrated send button
+  const canShowIntegratedButton = userAddress && usdcAddress && messageManagerAddress && chainId;
+  const isAnyPending = isApprovalPending || isPayMessagePending || isPayTxConfirming;
+
+  const handleApproveUSDC = async () => {
+    if (!usdcAddress || !messageManagerAddress) return;
+    
+    try {
+      // Approve a larger amount (100 USDC) so users don't need to approve every message
+      const approvalAmount = BigInt(MESSAGE_PRICE_USDC) * BigInt(10); // 10 messages worth
+      await writeApproval({
+        address: usdcAddress,
+        abi: ERC20_ABI,
+        functionName: 'approve',
+        args: [messageManagerAddress, approvalAmount],
+      });
+    } catch (error) {
+      console.error('Approval failed:', error);
+    }
+  };
+
+  const handlePayForMessage = async () => {
+    if (!userAddress || !chainId || !messageManagerAddress || !input.trim()) return;
+
+    try {
+      // Call the simplified contract function
+      const hash = await writePayMessageAsync({
+        address: messageManagerAddress,
+        abi: MESSAGE_MANAGER_ABI,
+        functionName: 'payForMessage',
+        args: [input.trim()], // Just pass the message string directly
+      });
+      // Track tx hash to await confirmation
+      if (hash) setPayTxHash(hash as `0x${string}`);
+      
+      // Success/error handling is done in useEffect hooks above
+    } catch (error) {
+      console.error('Pay for message failed:', error);
+    }
+  };
+
+  const getButtonContent = () => {
+    if (!canShowIntegratedButton) {
+      return { text: 'Send', action: sendMessage, variant: 'success' as const };
+    }
+
+    if (isLoadingApproval) {
+      return { 
+        text: <><Spinner size="sm" /> Checking...</>, 
+        action: () => {}, 
+        variant: 'secondary' as const,
+        disabled: true
+      };
+    }
+
+    if (!hasSufficientBalance) {
+      return { 
+        text: 'Insufficient USDC', 
+        action: () => {}, 
+        variant: 'danger' as const,
+        disabled: true
+      };
+    }
+
+    if (!hasApproval) {
+      return { 
+        text: isAnyPending ? <><Spinner size="sm" /> Approving...</> : 'Approve', 
+        action: handleApproveUSDC, 
+        variant: 'warning' as const
+      };
+    }
+
+    return { 
+      text: isAnyPending ? <><Spinner size="sm" /> Processing...</> : 'Pay and Send Message', 
+      action: handlePayForMessage, 
+      variant: 'success' as const
+    };
+  };
+
+  const buttonConfig = getButtonContent();
+  const isDisabled = connectionStatus !== 'connected' || isThinking || buttonConfig.disabled || isAnyPending;
+
   return (
     <Card.Footer className="p-3 border-top">
       <Form.Group className="mb-2">
@@ -18,24 +194,43 @@ function MessageInput({
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Type your message here..."
-          rows="2"
+          rows={2}
           disabled={connectionStatus !== 'connected' || isThinking}
         />
       </Form.Group>
       <div className="d-flex justify-content-between align-items-center">
         <div className={`connection-status ${connectionStatus}`}>
           {connectionStatus.charAt(0).toUpperCase() + connectionStatus.slice(1)}
+          {canShowIntegratedButton && hasApproval && (
+            <span className="text-muted ms-2">(1 USDC per message)</span>
+          )}
         </div>
         <Button 
-          variant="success"
-          onClick={sendMessage} 
-          disabled={connectionStatus !== 'connected' || isThinking}
+          variant={buttonConfig.variant}
+          onClick={buttonConfig.action} 
+          disabled={isDisabled}
         >
-          Send
+          {buttonConfig.text}
         </Button>
       </div>
+      
+      {/* Toast notifications */}
+      <ToastContainer position="top-end" className="p-3">
+        <Toast
+          show={showToast}
+          onClose={() => setShowToast(false)}
+          delay={4000}
+          autohide
+          bg="light"
+          className="shadow-sm border"
+        >
+          <Toast.Body className={toastVariant === 'success' ? 'text-success' : 'text-danger'}>
+            {toastMessage}
+          </Toast.Body>
+        </Toast>
+      </ToastContainer>
     </Card.Footer>
   );
 }
 
-export default MessageInput; 
+export default MessageInput;

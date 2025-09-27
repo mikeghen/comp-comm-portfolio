@@ -2,8 +2,8 @@
 import { base, baseSepolia, sepolia } from 'wagmi/chains';
 import { Address } from 'viem';
 
-// The wallet address from the backend
-export const ACCOUNT_ADDRESS = "0x47933ECd70eafbc34eD0232258440f8bAd1eA828" as Address;
+// The wallet address from the backend (Vault Manager Eth Sepolia)
+export const ACCOUNT_ADDRESS = "0x4cef30B8DA9db30D7CEBAd0bD86f82B9489B1d36" as Address;
 
 // Define type for contract addresses using Address from viem
 export interface CompoundNetworkContracts {
@@ -20,6 +20,7 @@ export interface CompoundNetworkContracts {
     cWETHv3?: Address;
     cAEROv3?: Address;
     Faucet?: Address;
+    MessageManager?: Address; // Placeholder for MessageManager contract
 }
 
 // Chain ID constants for clarity
@@ -42,6 +43,7 @@ export const CompoundContracts: Record<number, CompoundNetworkContracts> = {
         cUSDCv3: "0xb125E6687d4313864e53df431d5425969c15Eb2F",
         cWETHv3: "0x46e6b214b524310239732D51387075E0e70970bf",
         cAEROv3: "0x784efeB622244d2348d4F2522f8860B96fbEcE89",
+        MessageManager: "0x0000000000000000000000000000000000000000", // Placeholder - replace with actual deployment address
     },
     // Base Sepolia Testnet
     [BASE_SEPOLIA_CHAIN_ID]: {
@@ -50,7 +52,8 @@ export const CompoundContracts: Record<number, CompoundNetworkContracts> = {
         USDC: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
         WETH: "0x4200000000000000000000000000000000000006",
         cbETH: "0x774eD9EDB0C5202dF9A86183804b5D9E99dC6CA3",
-        Faucet: "0xD76cB57d8B097B80a6eE4D1b4d5ef872bfBa6051"
+        Faucet: "0xD76cB57d8B097B80a6eE4D1b4d5ef872bfBa6051",
+        MessageManager: "0x0000000000000000000000000000000000000000", // Placeholder - replace with actual deployment address
     },
     // Ethereum Sepolia Testnet
     [ETH_SEPOLIA_CHAIN_ID]: {
@@ -61,6 +64,7 @@ export const CompoundContracts: Record<number, CompoundNetworkContracts> = {
         WBTC: "0xa035b9e130F2B1AedC733eEFb1C67Ba4c503491F",
         cUSDCv3: "0xAec1F48e02Cfb822Be958B68C7957156EB3F0b6e",
         cWETHv3: "0x2943ac1216979aD8dB76D9147F64E61adc126e96",
+        MessageManager: "0xDa779e0Ed56140Bd700e3B891AD6e107E0Ef764D", // Sepolia MessageManager address
     }
 };
 
@@ -158,5 +162,6 @@ export function getWalletAssetsByChainId(chainId?: number): WalletAsset[] {
 
 import ERC20_ABI from "./abi/ERC20.json";
 import COMET_ABI from "./abi/Comet.json";
+import MESSAGE_MANAGER_ABI from "./abi/MessageManager.json";
 
-export { ERC20_ABI, COMET_ABI };
+export { ERC20_ABI, COMET_ABI, MESSAGE_MANAGER_ABI };
