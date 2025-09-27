@@ -190,11 +190,11 @@ const App: React.FC = () => {
     setInput('');
   };
 
-  // Update the handleKeyDown to be async
-  const handleKeyDown = async (e: React.KeyboardEvent<HTMLTextAreaElement>): Promise<void> => {
+  // Handle key down events - prevent Enter from sending messages
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      await sendMessage();
+      // Enter key is disabled for sending messages - only button click sends
     }
   };
 
