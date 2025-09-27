@@ -27,6 +27,7 @@ function MessageInput({
   const [toastMessage, setToastMessage] = useState('');
   const [toastVariant, setToastVariant] = useState<'success' | 'danger'>('success');
   const [payTxHash, setPayTxHash] = useState<`0x${string}` | undefined>(undefined);
+  const [approvalTxHash, setApprovalTxHash] = useState<`0x${string}` | undefined>(undefined);
   
   // Get USDC approval status
   const { 
@@ -44,7 +45,8 @@ function MessageInput({
     isPending: isApprovalPending,
     isSuccess: isApprovalSuccess,
     isError: isApprovalError,
-    error: approvalError
+    error: approvalError,
+    data: approvalHash
   } = useWriteContract();
   
   const { 
@@ -62,16 +64,24 @@ function MessageInput({
     isSuccess: isPayTxConfirmed,
   } = useWaitForTransactionReceipt({ hash: payTxHash });
 
+  // Wait for approval tx confirmation
+  const {
+    isLoading: isApprovalTxConfirming,
+    isSuccess: isApprovalTxConfirmed,
+  } = useWaitForTransactionReceipt({ hash: approvalTxHash });
+
   // Handle success and error states
   useEffect(() => {
-    if (isApprovalSuccess) {
-      setToastMessage('USDC approval successful!');
+    if (isApprovalTxConfirmed) {
+      setToastMessage('USDC approval confirmed!');
       setToastVariant('success');
       setShowToast(true);
-      // Refetch allowance to update button state
+      // Refetch allowance to update button state after confirmation
       refetchAllowance();
+      // Reset approval hash
+      setApprovalTxHash(undefined);
     }
-  }, [isApprovalSuccess, refetchAllowance]);
+  }, [isApprovalTxConfirmed, refetchAllowance]);
 
   useEffect(() => {
     if (isApprovalError) {
@@ -80,6 +90,13 @@ function MessageInput({
       setShowToast(true);
     }
   }, [isApprovalError, approvalError]);
+
+  // Track approval transaction hash when it becomes available
+  useEffect(() => {
+    if (isApprovalSuccess && approvalHash) {
+      setApprovalTxHash(approvalHash as `0x${string}`);
+    }
+  }, [isApprovalSuccess, approvalHash]);
 
   useEffect(() => {
     if (isPayTxConfirmed) {
@@ -105,7 +122,7 @@ function MessageInput({
 
   // Check if we can show the integrated send button
   const canShowIntegratedButton = userAddress && usdcAddress && messageManagerAddress && chainId;
-  const isAnyPending = isApprovalPending || isPayMessagePending || isPayTxConfirming;
+  const isAnyPending = isApprovalPending || isPayMessagePending || isPayTxConfirming || isApprovalTxConfirming;
 
   const handleApproveUSDC = async () => {
     if (!usdcAddress || !messageManagerAddress) return;
@@ -113,7 +130,7 @@ function MessageInput({
     try {
       // Approve a larger amount (100 USDC) so users don't need to approve every message
       const approvalAmount = BigInt(MESSAGE_PRICE_USDC) * BigInt(10); // 10 messages worth
-      await writeApproval({
+      writeApproval({
         address: usdcAddress,
         abi: ERC20_ABI,
         functionName: 'approve',

@@ -1,20 +1,22 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { Card, ListGroup, Spinner } from 'react-bootstrap';
-import AssetRow from './AssetRow';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { useReadContract, useBlockNumber, useAccount } from 'wagmi';
 import { formatUnits } from 'viem';
 import { 
   ACCOUNT_ADDRESS,
-  ERC20_ABI,
-  getContractsByChainId,
+  ERC20_ABI, 
+  getContractsByChainId, 
   getWalletAssetsByChainId,
   isSupportedChain 
-} from '../../config/contracts';
-import { getTokenPricesWithFallback } from '../../utils/priceService';
+} from '../config/contracts';
+import { getTokenPricesWithFallback } from '../utils/priceService';
 
-const WalletAssetsList: React.FC = () => {
+/**
+ * Hook to calculate total portfolio value
+ */
+export function usePortfolioValue() {
   const { chainId } = useAccount();
   const { data: blockNumber } = useBlockNumber({ watch: true });
+  const prevBlockNumberRef = useRef<bigint | undefined>();
   
   // Check if the current chain is supported
   const isSupported = isSupportedChain(chainId);
@@ -22,9 +24,6 @@ const WalletAssetsList: React.FC = () => {
   // Get contract addresses and wallet assets for current chain
   const contracts = useMemo(() => getContractsByChainId(chainId), [chainId]);
   const walletAssets = useMemo(() => getWalletAssetsByChainId(chainId), [chainId]);
-  
-  // State to track initial loading
-  const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
   
   // State for token prices
   const [tokenPrices, setTokenPrices] = useState<Record<string, number>>({});
@@ -61,7 +60,8 @@ const WalletAssetsList: React.FC = () => {
     }
   }, [walletAssets]);
   
-  // Create contract read hooks using fixed number to ensure consistent hook order
+  // Create hooks for wallet asset balances using a fixed number based on maximum assets
+  // This ensures consistent hook order across renders
   const asset0 = walletAssets && walletAssets[0];
   const asset1 = walletAssets && walletAssets[1];
   const asset2 = walletAssets && walletAssets[2];
@@ -155,106 +155,71 @@ const WalletAssetsList: React.FC = () => {
   });
   
   // Create array of hooks that correspond to actual assets
-  const assetBalanceHooks = useMemo(() => {
+  const walletAssetHooks = useMemo(() => {
     if (!walletAssets) return [];
     
     const hooks = [hook0, hook1, hook2, hook3, hook4, hook5, hook6, hook7, hook8];
     return hooks.slice(0, walletAssets.length);
   }, [walletAssets, hook0, hook1, hook2, hook3, hook4, hook5, hook6, hook7, hook8]);
   
-  // Process the wallet assets data
-  const processedAssets = useMemo(() => {
-    if (!contracts || !walletAssets || walletAssets.length === 0) return [];
+  // Calculate total wallet value
+  const totalWalletValue = useMemo(() => {
+    if (!contracts || !walletAssets || walletAssets.length === 0) return 0;
     
-    return walletAssets.map((asset, index) => {
-      const contractAddress = contracts[asset.contractKey];
-      const balanceResult = assetBalanceHooks[index];
+    return walletAssets.reduce((total, asset, index) => {
+      const balanceResult = walletAssetHooks[index];
+      if (!balanceResult || balanceResult.data === undefined || balanceResult.isError) return total;
       
-      if (!contractAddress || !balanceResult || balanceResult.isError || balanceResult.data === undefined) {
-        return null;
-      }
-      
-      // Format the balance
       const balance = formatUnits(balanceResult.data as bigint, asset.decimals);
-      
-      // Get real-time price from CoinGecko (with fallback)
       const price = tokenPrices[asset.symbol] || 0;
-      const balanceUSD = (parseFloat(balance) * price).toFixed(2);
+      const value = parseFloat(balance) * price;
       
-      return {
-        symbol: asset.symbol,
-        balance,
-        price: price.toFixed(2),
-        balanceUSD,
-        contractAddress,
-      };
-    }).filter(asset => asset && parseFloat(asset.balance) > 0);
-  }, [contracts, walletAssets, assetBalanceHooks, tokenPrices]);
-  
-  // Track when initial loading is complete
-  useEffect(() => {
-    if (!hasInitiallyLoaded) {
-      // Check if all hooks have completed (either with data or error)
-      const allCompleted = assetBalanceHooks.length > 0 && assetBalanceHooks.every(hook => 
-        hook && (hook.data !== undefined || hook.isError)
-      );
-      
-      if ((allCompleted && contracts && !pricesLoading) || (walletAssets && walletAssets.length === 0)) {
-        setHasInitiallyLoaded(true);
-      }
-    }
-  }, [hasInitiallyLoaded, contracts, pricesLoading, assetBalanceHooks, walletAssets]);
-  
-  // Create a stable reference for loading check
-  const isAnyLoading = assetBalanceHooks.some(hook => hook && hook.isLoading);
-  const hasErrors = assetBalanceHooks.some(hook => hook && hook.isError);
-  
-  // Determine loading state
-  const isLoading = !hasInitiallyLoaded && (isAnyLoading || pricesLoading);
-  
-  return (
-    <Card className="mb-4">
-      <Card.Header className="bg-white border-bottom">
-        <h5 className="mb-0">Holdings</h5>
-      </Card.Header>
-      <ListGroup variant="flush">
-        {!isSupported ? (
-          <ListGroup.Item className="text-center py-3 text-warning">
-            Please connect to a supported network
-          </ListGroup.Item>
-        ) : isLoading ? (
-          <ListGroup.Item className="text-center py-3">
-            <Spinner animation="border" size="sm" /> Loading wallet assets...
-          </ListGroup.Item>
-        ) : hasErrors ? (
-          <ListGroup.Item className="text-center py-3 text-danger">
-            Error loading wallet data
-            <div className="small mt-1">
-              Check console for detailed error information
-            </div>
-          </ListGroup.Item>
-        ) : processedAssets.length === 0 ? (
-          <ListGroup.Item className="text-center py-3 text-muted">
-            No wallet assets found
-          </ListGroup.Item>
-        ) : (
-          processedAssets.map((asset, index) => {
-            if (!asset) return null;
-            
-            return (
-              <AssetRow 
-                key={`${asset.symbol}-${asset.contractAddress}`}
-                symbol={asset.symbol}
-                amount={asset.balance}
-                value={asset.balanceUSD}
-                price={asset.price}
-              />
-            );
-          })
-        )}
-      </ListGroup>
-    </Card>
-  );
-};
+      return total + (isNaN(value) ? 0 : value);
+    }, 0);
+  }, [contracts, walletAssets, walletAssetHooks, blockNumber, tokenPrices]);
 
-export default WalletAssetsList;
+  // Track initial load state
+  const [hasLoaded, setHasLoaded] = useState(false);
+  useEffect(() => {
+    if (walletAssetHooks.length > 0) {
+      const allLoaded = walletAssetHooks.every(hook => hook.data !== undefined || hook.isError);
+      if (allLoaded) {
+        setHasLoaded(true);
+      }
+    } else if (walletAssets && walletAssets.length === 0) {
+      setHasLoaded(true);
+    }
+  }, [walletAssetHooks, walletAssets]);
+
+  // Refetch data when block number changes
+  useEffect(() => {
+    if (blockNumber && blockNumber !== prevBlockNumberRef.current && walletAssetHooks.length > 0) {
+      // Refetch wallet asset balances
+      walletAssetHooks.forEach(hook => {
+        if (hook && hook.refetch) {
+          hook.refetch();
+        }
+      });
+      
+      prevBlockNumberRef.current = blockNumber;
+    }
+  }, [blockNumber, walletAssetHooks]);
+
+  // Determine final loading and error states
+  const isWalletLoading = walletAssetHooks.some(hook => hook && hook.isLoading);
+  const isWalletError = walletAssetHooks.some(hook => hook && hook.isError);
+  const isLoading = (!hasLoaded && isWalletLoading);
+  const isError = isWalletError;
+
+  return {
+    totalWalletValue,
+    isSupported,
+    isLoading,
+    isError,
+    pricesLoading,
+    tokenPrices,
+    walletAssets,
+    walletAssetHooks,
+    hasLoaded
+  };
+}

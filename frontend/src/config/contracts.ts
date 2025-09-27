@@ -21,6 +21,7 @@ export interface CompoundNetworkContracts {
     cAEROv3?: Address;
     Faucet?: Address;
     MessageManager?: Address; // Placeholder for MessageManager contract
+    ManagementToken?: Address; // ManagementToken contract
 }
 
 // Chain ID constants for clarity
@@ -65,6 +66,7 @@ export const CompoundContracts: Record<number, CompoundNetworkContracts> = {
         cUSDCv3: "0xAec1F48e02Cfb822Be958B68C7957156EB3F0b6e",
         cWETHv3: "0x2943ac1216979aD8dB76D9147F64E61adc126e96",
         MessageManager: "0xDa779e0Ed56140Bd700e3B891AD6e107E0Ef764D", // Sepolia MessageManager address
+        ManagementToken: "0xEf4f63830E0528254579731C46D69aF74cC7d1ad", // Sepolia ManagementToken address
     }
 };
 
