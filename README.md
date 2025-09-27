@@ -9,7 +9,7 @@ This is a template for developers looking to build an assistant that can interac
 ![Compound Assistant Preview](./preview.png)
 
 ## System Architecture
-![System Architecture](./compcomp_arch.png)
+![System Architecture](./docs/images/compcomm_arch.png)
 
 ## Code Architecture
 ```mermaid
