@@ -11,7 +11,8 @@ python = "^3.10"
 python-dotenv = "^1.0.1"
 langchain-openai = "^0.2.4"
 langgraph = "^0.2.39"
-coinbase-agentkit = { path = "../../agentkit/python/coinbase-agentkit", develop = true }
+coinbase-agentkit = { git = "https://github.com/mikeghen/agentkit.git", rev = "a89f97bd2b173cc2f4705087f35f955316f9e395", subdirectory = "python/coinbase-agentkit" }
+#coinbase-agentkit = { path = "../../agentkit/python/coinbase-agentkit", develop = true }
 coinbase-agentkit-langchain = "^0.1.0"
 fastapi = "^0.110.0"
 uvicorn = "^0.27.1"
