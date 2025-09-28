@@ -13,7 +13,9 @@ function ManagementTokenInfo({ portfolioValue }: ManagementTokenInfoProps) {
   // Use ManagementToken hook (always call hooks first)
   const { 
     totalSupply: mtTotalSupply, 
+    userBalance,
     mtTokenPrice,
+    userHoldingValue,
     isLoading,
     isError
   } = useManagementToken(portfolioValue);
@@ -34,6 +36,18 @@ function ManagementTokenInfo({ portfolioValue }: ManagementTokenInfoProps) {
     maximumFractionDigits: 1
   });
 
+  const formattedUserBalance = userBalance.toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  });
+
+  const formattedUserHoldingValue = userHoldingValue.toLocaleString('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+
   if (isLoading || isError || mtTotalSupply === 0) return null;
 
   const tooltipContent = (
@@ -48,11 +62,23 @@ function ManagementTokenInfo({ portfolioValue }: ManagementTokenInfoProps) {
     </Tooltip>
   );
 
+  const yourEvTooltipContent = (
+    <Tooltip id="your-ev-tooltip">
+      <div style={{ maxWidth: '280px', textAlign: 'left' }}>
+        <strong>Your Expected Value</strong><br/>
+        The estimated total value of your MT token holdings based on current portfolio value.<br/><br/>
+        <strong>Calculation:</strong> Your MT Balance × MT Expected Value<br/>
+        <strong>Current:</strong> {formattedUserBalance} MT × {formattedMtPrice} = {formattedUserHoldingValue}<br/><br/>
+        <em>This represents your potential redemption value when the portfolio enters the redemption phase.</em>
+      </div>
+    </Tooltip>
+  );
+
   return (
     <div className="card mb-3">
       <div className="card-body py-2">
         <div className="row text-muted small align-items-center">
-          <div className="col-5">
+          <div className="col-4">
             <div className="d-flex align-items-center gap-1">
               <span>MT EV</span>
               <OverlayTrigger
@@ -84,9 +110,41 @@ function ManagementTokenInfo({ portfolioValue }: ManagementTokenInfoProps) {
             </div>
             <div>{formattedMtPrice}</div>
           </div>
-          <div className="col-7">
+          <div className="col-4">
             <span>Total Supply</span>
             <div>{formattedMtTotalSupply} MT</div>
+          </div>
+          <div className="col-4">
+            <div className="d-flex align-items-center gap-1">
+              <span>Your EV</span>
+              <OverlayTrigger
+                placement="left"
+                delay={{ show: 250, hide: 400 }}
+                overlay={yourEvTooltipContent}
+                trigger={['hover', 'focus']}
+              >
+                <span 
+                  style={{ 
+                    fontSize: '0.75rem', 
+                    cursor: 'help', 
+                    opacity: 0.7,
+                    fontWeight: 'bold',
+                    color: '#6c757d',
+                    border: '1px solid #6c757d',
+                    borderRadius: '50%',
+                    width: '14px',
+                    height: '14px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    lineHeight: 1
+                  }}
+                >
+                  ?
+                </span>
+              </OverlayTrigger>
+            </div>
+            <div>{formattedUserBalance} MT <span className="text-success" style={{ fontSize: '0.7rem' }}>({formattedUserHoldingValue})</span></div>
           </div>
         </div>
       </div>
