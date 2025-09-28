@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Create non-root user for security
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
 # Install Poetry (latest version)
 RUN curl -sSL https://install.python-poetry.org | python3 -
 ENV PATH="$POETRY_HOME/bin:$PATH"
@@ -22,11 +25,17 @@ WORKDIR /app
 # Copy poetry configuration files
 COPY pyproject.toml poetry.lock* ./
 
+# Install dependencies first (better caching)
+RUN poetry install --no-interaction --no-ansi --no-dev
+
 # Copy the rest of the application
 COPY . .
 
-# Install dependencies
-RUN poetry install --no-interaction --no-ansi
+# Create logs directory and set permissions
+RUN mkdir -p /app/logs && chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
 
 # Expose the port the app runs on
 EXPOSE 8000

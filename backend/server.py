@@ -147,6 +147,55 @@ manager = ConnectionManager()
 message_handler = MessageEventHandler(agent, event_listener, manager)
 event_listener.add_event_handler("MessagePaid", message_handler.handle_message_paid_event)
 
+# Health check endpoint for Docker and monitoring
+@app.get("/healthy")
+async def health_check():
+    """
+    Health check endpoint for Docker containers and load balancers.
+    Returns basic system status and connectivity information.
+    """
+    try:
+        # Check if Web3 client is connected
+        blockchain_connected = web3_client.is_connected() if web3_client else False
+        
+        # Check if event listener is active
+        listener_active = blockchain_listener_task and not blockchain_listener_task.done() if blockchain_listener_task else False
+        
+        # Get current block number if connected
+        current_block = None
+        if blockchain_connected:
+            try:
+                current_block = web3_client.get_web3().eth.block_number
+            except Exception:
+                current_block = None
+        
+        # Determine overall health status
+        is_healthy = blockchain_connected and bool(contract_address)
+        
+        health_data = {
+            "status": "healthy" if is_healthy else "degraded",
+            "timestamp": asyncio.get_event_loop().time(),
+            "blockchain_connected": blockchain_connected,
+            "event_listener_active": listener_active,
+            "contract_address": contract_address,
+            "current_block": current_block,
+            "active_websocket_connections": len(manager.active_connections),
+            "environment": ENVIRONMENT
+        }
+        
+        # Return 200 if healthy, 503 if degraded
+        status_code = 200 if is_healthy else 503
+        return health_data
+        
+    except Exception as e:
+        # Return error status if health check itself fails
+        return {
+            "status": "unhealthy",
+            "timestamp": asyncio.get_event_loop().time(),
+            "error": str(e),
+            "environment": ENVIRONMENT
+        }
+
 # Global variable to track if blockchain listener is running
 blockchain_listener_task = None
 

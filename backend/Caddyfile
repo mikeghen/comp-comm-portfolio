@@ -1,0 +1,106 @@
+# Caddyfile for Compound Community Backend API
+# Provides HTTPS/WSS termination and reverse proxy to backend
+
+# API endpoint - serves backend API and WebSocket connections
+api.compcomm.club {
+    # Enable automatic HTTPS
+    tls {
+        # Let's Encrypt will automatically provision certificates
+        email info@compcomm.club
+    }
+    
+    # Enable real IP forwarding for proper client IP detection
+    header_up X-Real-IP {remote}
+    header_up X-Forwarded-For {remote}
+    header_up X-Forwarded-Proto {scheme}
+    header_up X-Forwarded-Host {host}
+    
+    # Log requests for debugging and monitoring
+    log {
+        output file /var/log/caddy/api.compcomm.club.log
+        format json
+    }
+    
+    # WebSocket endpoint - upgrade HTTP to WebSocket for real-time communication
+    @websockets {
+        header Connection *Upgrade*
+        header Upgrade websocket
+        path /ws/*
+    }
+    
+    # Handle WebSocket connections with special settings
+    handle @websockets {
+        reverse_proxy backend:8000 {
+            # WebSocket specific headers
+            header_up Host {host}
+            header_up Origin {header.origin}
+            
+            # Keep connection alive
+            flush_interval -1
+            
+            # Health check for WebSocket endpoint
+            health_uri /healthy
+            health_interval 10s
+        }
+    }
+    
+    # Handle all other HTTP requests (API endpoints, docs, etc.)
+    handle {
+        reverse_proxy backend:8000 {
+            # Standard HTTP headers
+            header_up Host {host}
+            
+            # Health check
+            health_uri /healthy
+            health_interval 30s
+            health_timeout 5s
+            
+            # Timeout settings
+            dial_timeout 5s
+            read_timeout 30s
+            write_timeout 30s
+        }
+    }
+    
+    # Security headers
+    header {
+        # HSTS - Force HTTPS for 1 year
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        
+        # Prevent MIME type sniffing
+        X-Content-Type-Options "nosniff"
+        
+        # XSS protection
+        X-XSS-Protection "1; mode=block"
+        
+        # Prevent clickjacking
+        X-Frame-Options "DENY"
+        
+        # CSP - Allow connections to self and frontend domains
+        Content-Security-Policy "default-src 'self'; connect-src 'self' wss://api.compcomm.club https://www.compcomm.club https://compcomm.club; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
+        
+        # Referrer policy
+        Referrer-Policy "strict-origin-when-cross-origin"
+        
+        # Remove server identification
+        -Server
+    }
+    
+    # Error handling
+    handle_errors {
+        @5xx expression {http.error.status_code} >= 500
+        handle @5xx {
+            respond "Service temporarily unavailable" 503
+        }
+        
+        @4xx expression {http.error.status_code} >= 400
+        handle @4xx {
+            respond "Bad request" 400
+        }
+    }
+}
+
+# Redirect HTTP to HTTPS
+http://api.compcomm.club {
+    redir https://api.compcomm.club{uri} permanent
+}

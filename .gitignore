@@ -83,3 +83,6 @@ coverage.xml
 # OS-specific files
 .DS_Store
 Thumbs.db 
+
+# Internal docs
+backend/DEPLOYMENT.md

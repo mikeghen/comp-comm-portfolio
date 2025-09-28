@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    container_name: compcomm-backend
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=production
+    expose:
+      - "8000"
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - compcomm-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: compcomm-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - compcomm-network
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  caddy_data:
+    external: true
+  caddy_config:
+
+networks:
+  compcomm-network:
+    driver: bridge
