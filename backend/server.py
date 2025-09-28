@@ -218,40 +218,8 @@ def verify_signature(message: str, signature: str, address: str) -> bool:
         print(f"Error verifying signature: {e}")
         return False
 
-def validate_websocket_origin(websocket: WebSocket) -> bool:
-    """Validate that the WebSocket connection is from an allowed origin."""
-    try:
-        # Get the Origin header from the WebSocket request
-        origin = websocket.headers.get("origin")
-        
-        if not origin:
-            print("❌ WebSocket connection rejected: No origin header")
-            return False
-        
-        # Normalize the origin URL
-        parsed_origin = urlparse(origin)
-        normalized_origin = f"{parsed_origin.scheme}://{parsed_origin.netloc}"
-        
-        # Check if the origin is in our allowed list
-        if normalized_origin in ALLOWED_ORIGINS:
-            print(f"✅ WebSocket connection allowed from origin: {normalized_origin}")
-            return True
-        else:
-            print(f"❌ WebSocket connection rejected from unauthorized origin: {normalized_origin}")
-            print(f"   Allowed origins: {ALLOWED_ORIGINS}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Error validating WebSocket origin: {e}")
-        return False
-
 @app.websocket("/ws/chat")
 async def websocket_endpoint(websocket: WebSocket):
-    # Validate the origin before accepting the connection
-    if not validate_websocket_origin(websocket):
-        await websocket.close(code=1008, reason="Origin not allowed")
-        return
-    
     await manager.connect(websocket)
     print("💬 New WebSocket connection established and validated")
     
