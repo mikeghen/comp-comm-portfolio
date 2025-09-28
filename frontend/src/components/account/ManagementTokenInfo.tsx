@@ -10,16 +10,16 @@ interface ManagementTokenInfoProps {
 function ManagementTokenInfo({ portfolioValue }: ManagementTokenInfoProps) {
   const { chainId } = useAccount();
   
-  // Only show on Ethereum Sepolia
-  if (chainId !== 11155111) return null;
-
-  // Use ManagementToken hook
+  // Use ManagementToken hook (always call hooks first)
   const { 
     totalSupply: mtTotalSupply, 
     mtTokenPrice,
     isLoading,
     isError
   } = useManagementToken(portfolioValue);
+
+  // Only show on Ethereum Sepolia
+  if (chainId !== 11155111) return null;
 
   // Format values for display
   const formattedMtPrice = mtTokenPrice.toLocaleString('en-US', {
