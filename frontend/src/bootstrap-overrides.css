@@ -117,8 +117,82 @@
     color: white;
 }
 
+/* Navbar compactness adjustments */
+.navbar {
+    padding: 0.25rem 0 !important;
+    min-height: auto !important;
+}
+
+.navbar .container {
+    padding: 0.4rem 1rem !important;
+}
+
+/* Navbar font size adjustments */
+.navbar-brand {
+    font-size: 1.1rem !important;
+    padding: 0.2rem 0 !important;
+    margin-right: 1rem !important;
+}
+
+.navbar-brand .badge {
+    font-size: 0.7rem !important;
+}
+
+/* Wallet connect button styling */
+.wallet-connect-container {
+    font-size: 0.85rem !important;
+    margin: 0 !important;
+}
+
+.wallet-connect-container button {
+    font-size: 0.8rem !important;
+    padding: 0.3rem 0.6rem !important;
+}
+
+/* Navbar collapse compactness */
+.navbar-collapse {
+    padding: 0 !important;
+}
+
+.navbar-nav {
+    margin: 0 !important;
+}
+
+.nav-link {
+    padding: 0.2rem 0.5rem !important;
+}
+
+/* RainbowKit connect button override */
+.wallet-connect-container [data-testid="rk-connect-button"] {
+    font-size: 0.8rem !important;
+}
+
+/* General navbar text size reduction */
+.navbar .nav-link {
+    font-size: 0.9rem !important;
+}
+
 @media (max-width: 991.98px) {
     .chat-messages {
         height: 50vh;
+    }
+    
+    /* Even more compact on mobile */
+    .navbar {
+        padding: 0.15rem 0 !important;
+    }
+    
+    .navbar .container {
+        padding: 0.3rem 0.8rem !important;
+    }
+    
+    .navbar-brand {
+        font-size: 1rem !important;
+        padding: 0.1rem 0 !important;
+    }
+    
+    .wallet-connect-container button {
+        font-size: 0.75rem !important;
+        padding: 0.25rem 0.5rem !important;
     }
 } 

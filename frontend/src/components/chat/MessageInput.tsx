@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Form, Button, Card, Spinner, Toast, ToastContainer } from 'react-bootstrap';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useUSDCApproval } from '../../hooks/useUSDCApproval';
-import { ERC20_ABI, MESSAGE_MANAGER_ABI, getContractAddress } from '../../config/contracts';
+import { useFaucet } from '../../hooks/useFaucet';
+import { ERC20_ABI, MESSAGE_MANAGER_ABI, FAUCET_ABI, getContractAddress } from '../../config/contracts';
 import { MESSAGE_PRICE_USDC } from '../../utils/messageManager';
 
 interface MessageInputProps {
@@ -30,6 +31,7 @@ function MessageInput({
   const [toastVariant, setToastVariant] = useState<'success' | 'danger'>('success');
   const [payTxHash, setPayTxHash] = useState<`0x${string}` | undefined>(undefined);
   const [approvalTxHash, setApprovalTxHash] = useState<`0x${string}` | undefined>(undefined);
+  const [faucetTxHash, setFaucetTxHash] = useState<`0x${string}` | undefined>(undefined);
   
   // Get USDC approval status
   const { 
@@ -38,8 +40,16 @@ function MessageInput({
     isLoading: isLoadingApproval,
     usdcAddress,
     messageManagerAddress,
-    refetchAllowance 
+    refetchAllowance,
+    refetchBalance 
   } = useUSDCApproval();
+
+  // Get faucet status
+  const { 
+    faucetAddress, 
+    usdcAddress: faucetUsdcAddress, 
+    isFaucetAvailable 
+  } = useFaucet();
 
   // Contract write hooks
   const { 
@@ -60,6 +70,15 @@ function MessageInput({
     error: payMessageError
   } = useWriteContract();
 
+  const { 
+    writeContract: writeFaucet,
+    isPending: isFaucetPending,
+    isSuccess: isFaucetSuccess,
+    isError: isFaucetError,
+    error: faucetError,
+    data: faucetHash
+  } = useWriteContract();
+
   // Wait for payForMessage tx confirmation
   const {
     isLoading: isPayTxConfirming,
@@ -71,6 +90,12 @@ function MessageInput({
     isLoading: isApprovalTxConfirming,
     isSuccess: isApprovalTxConfirmed,
   } = useWaitForTransactionReceipt({ hash: approvalTxHash });
+
+  // Wait for faucet tx confirmation
+  const {
+    isLoading: isFaucetTxConfirming,
+    isSuccess: isFaucetTxConfirmed,
+  } = useWaitForTransactionReceipt({ hash: faucetTxHash });
 
   // Handle success and error states
   useEffect(() => {
@@ -122,6 +147,33 @@ function MessageInput({
     }
   }, [isPayMessageError, payMessageError]);
 
+  // Track faucet transaction hash when it becomes available
+  useEffect(() => {
+    if (isFaucetSuccess && faucetHash) {
+      setFaucetTxHash(faucetHash as `0x${string}`);
+    }
+  }, [isFaucetSuccess, faucetHash]);
+
+  useEffect(() => {
+    if (isFaucetTxConfirmed) {
+      setToastMessage('USDC received from faucet! You can now send messages.');
+      setToastVariant('success');
+      setShowToast(true);
+      // Refresh balance so button state updates
+      refetchBalance();
+      // Reset stored hash
+      setFaucetTxHash(undefined);
+    }
+  }, [isFaucetTxConfirmed, refetchBalance]);
+
+  useEffect(() => {
+    if (isFaucetError) {
+      setToastMessage('Faucet request failed. Please try again.');
+      setToastVariant('danger');
+      setShowToast(true);
+    }
+  }, [isFaucetError, faucetError]);
+
   // Check if we can show the integrated send button
   const canShowIntegratedButton = userAddress && usdcAddress && messageManagerAddress && chainId;
   const isAnyPending = isApprovalPending || isPayMessagePending || isPayTxConfirming || isApprovalTxConfirming;
@@ -165,6 +217,21 @@ function MessageInput({
       // Success/error handling is done in useEffect hooks above
     } catch (error) {
       console.error('Pay for message failed:', error);
+    }
+  };
+
+  const handleFaucetRequest = async () => {
+    if (!faucetAddress || !faucetUsdcAddress) return;
+    
+    try {
+      writeFaucet({
+        address: faucetAddress,
+        abi: FAUCET_ABI,
+        functionName: 'faucet',
+        args: [faucetUsdcAddress],
+      });
+    } catch (error) {
+      console.error('Faucet request failed:', error);
     }
   };
 
@@ -223,10 +290,32 @@ function MessageInput({
         />
       </Form.Group>
       <div className="d-flex justify-content-between align-items-center">
-        <div className={`connection-status ${connectionStatus}`}>
-          {connectionStatus.charAt(0).toUpperCase() + connectionStatus.slice(1)}
-          {canShowIntegratedButton && hasApproval && (
-            <span className="text-muted ms-2">(1 USDC per message)</span>
+        <div>
+          <div className={`connection-status ${connectionStatus}`}>
+            {connectionStatus.charAt(0).toUpperCase() + connectionStatus.slice(1)}
+            {canShowIntegratedButton && hasApproval && (
+              <span className="text-muted ms-2">(1 USDC per message)</span>
+            )}
+          </div>
+          {isFaucetAvailable && (
+            <small>
+              <button 
+                type="button"
+                className="btn btn-link p-0 text-decoration-none small"
+                onClick={handleFaucetRequest}
+                disabled={isFaucetPending || isFaucetTxConfirming}
+                style={{ fontSize: '0.75rem' }}
+              >
+                {isFaucetPending || isFaucetTxConfirming ? (
+                  <>
+                    <Spinner size="sm" className="me-1" />
+                    Getting USDC...
+                  </>
+                ) : (
+                  'Get USDC from Faucet'
+                )}
+              </button>
+            </small>
           )}
         </div>
         <Button 

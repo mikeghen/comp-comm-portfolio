@@ -65,6 +65,7 @@ export const CompoundContracts: Record<number, CompoundNetworkContracts> = {
         WBTC: "0xa035b9e130F2B1AedC733eEFb1C67Ba4c503491F",
         cUSDCv3: "0xAec1F48e02Cfb822Be958B68C7957156EB3F0b6e",
         cWETHv3: "0x2943ac1216979aD8dB76D9147F64E61adc126e96",
+        Faucet: "0x68793eA49297eB75DFB4610B68e076D2A5c7646C", // Sepolia USDC Faucet
         MessageManager: "0xDa779e0Ed56140Bd700e3B891AD6e107E0Ef764D", // Sepolia MessageManager address
         ManagementToken: "0xEf4f63830E0528254579731C46D69aF74cC7d1ad", // Sepolia ManagementToken address
     }
@@ -165,5 +166,6 @@ export function getWalletAssetsByChainId(chainId?: number): WalletAsset[] {
 import ERC20_ABI from "./abi/ERC20.json";
 import COMET_ABI from "./abi/Comet.json";
 import MESSAGE_MANAGER_ABI from "./abi/MessageManager.json";
+import FAUCET_ABI from "./abi/Faucet.json";
 
-export { ERC20_ABI, COMET_ABI, MESSAGE_MANAGER_ABI };
+export { ERC20_ABI, COMET_ABI, MESSAGE_MANAGER_ABI, FAUCET_ABI };
