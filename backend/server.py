@@ -6,6 +6,7 @@ import json
 import logging
 import asyncio
 from typing import List, Dict, Any
+from urllib.parse import urlparse
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -37,15 +38,33 @@ sys.stderr.reconfigure(line_buffering=True)
 # Load environment variables
 load_dotenv()
 
+# Environment detection
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
+IS_PRODUCTION = ENVIRONMENT == "production"
+
+# Configure allowed origins based on environment
+if IS_PRODUCTION:
+    ALLOWED_ORIGINS = [
+        "https://compcomm.club",
+        "https://www.compcomm.club"
+    ]
+    print(f"🔒 Production mode: CORS restricted to {ALLOWED_ORIGINS}")
+else:
+    ALLOWED_ORIGINS = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000"
+    ]
+    print(f"🔧 Development mode: CORS restricted to {ALLOWED_ORIGINS}")
+
 # Create FastAPI app
 app = FastAPI(title="Compound Assistant API")
 
-# Add CORS middleware
+# Add CORS middleware with environment-specific origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins like "http://localhost:3000"
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -150,10 +169,42 @@ def verify_signature(message: str, signature: str, address: str) -> bool:
         print(f"Error verifying signature: {e}")
         return False
 
+def validate_websocket_origin(websocket: WebSocket) -> bool:
+    """Validate that the WebSocket connection is from an allowed origin."""
+    try:
+        # Get the Origin header from the WebSocket request
+        origin = websocket.headers.get("origin")
+        
+        if not origin:
+            print("❌ WebSocket connection rejected: No origin header")
+            return False
+        
+        # Normalize the origin URL
+        parsed_origin = urlparse(origin)
+        normalized_origin = f"{parsed_origin.scheme}://{parsed_origin.netloc}"
+        
+        # Check if the origin is in our allowed list
+        if normalized_origin in ALLOWED_ORIGINS:
+            print(f"✅ WebSocket connection allowed from origin: {normalized_origin}")
+            return True
+        else:
+            print(f"❌ WebSocket connection rejected from unauthorized origin: {normalized_origin}")
+            print(f"   Allowed origins: {ALLOWED_ORIGINS}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Error validating WebSocket origin: {e}")
+        return False
+
 @app.websocket("/ws/chat")
 async def websocket_endpoint(websocket: WebSocket):
+    # Validate the origin before accepting the connection
+    if not validate_websocket_origin(websocket):
+        await websocket.close(code=1008, reason="Origin not allowed")
+        return
+    
     await manager.connect(websocket)
-    print("💬 New WebSocket connection established")
+    print("💬 New WebSocket connection established and validated")
     
     # Start blockchain listener if not already running
     global blockchain_listener_task
