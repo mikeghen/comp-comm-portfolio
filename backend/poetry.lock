@@ -792,7 +792,7 @@ optional = false
 python-versions = "^3.10"
 groups = ["main"]
 files = []
-develop = true
+develop = false
 
 [package.dependencies]
 cdp-sdk = "0.19.0"
@@ -802,8 +802,11 @@ requests = "^2.31.0"
 web3 = "^7.6.0"
 
 [package.source]
-type = "directory"
-url = "../../agentkit/python/coinbase-agentkit"
+type = "git"
+url = "https://github.com/mikeghen/agentkit.git"
+reference = "a89f97bd2b173cc2f4705087f35f955316f9e395"
+resolved_reference = "a89f97bd2b173cc2f4705087f35f955316f9e395"
+subdirectory = "python/coinbase-agentkit"
 
 [[package]]
 name = "coinbase-agentkit-langchain"
@@ -3650,4 +3653,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "31a87eab3634281ce1560249384ff21b1d25450798d75ee62819b58967a6ed72"
+content-hash = "b8f8b9272d39f436aa30a5298f5b76d2afa22f2973b6d12f411cd9e2f02800e7"
