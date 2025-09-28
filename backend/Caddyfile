@@ -4,10 +4,7 @@
 # API endpoint - serves backend API and WebSocket connections
 api.compcomm.club {
     # Enable automatic HTTPS
-    tls {
-        # Let's Encrypt will automatically provision certificates
-        email info@compcomm.club
-    }
+    tls info@compcomm.club
     
     # Enable real IP forwarding for proper client IP detection
     header_up X-Real-IP {remote}
