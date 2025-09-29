@@ -1,7 +1,6 @@
 """Main agent definition for the Compound Assistant."""
 
 import os
-import yaml
 import logging
 
 from langchain_openai import ChatOpenAI
@@ -48,13 +47,8 @@ def fetch_onchain_prompt():
 
 def load_system_prompt():
     """
-    Load the agent prompt from YAML and append the onchain policy from PolicyManager.
+    Load the agent prompt and append the onchain policy from PolicyManager.
     """
-    config_path = os.path.join(os.path.dirname(__file__), "config", "agent.yaml")
-    with open(config_path, "r") as yaml_file:
-        agent_config = yaml.safe_load(yaml_file)
-    agent = agent_config.get("agent", {})
-    
     # Base hardcoded system prompt
     base_prompt = (
         "You are a helpful agent that can interact with Compound Finance and Uniswap V3."
@@ -64,10 +58,6 @@ def load_system_prompt():
         "You maintain a friendly and educational tone in your responses."
         "Show transaction links using https://sepolia.etherscan.io/."
         "You have expert level skills writing Python code specifically for data analysis."
-        "\n"    
-        f"Your Role: {agent.get('role', '')}\n"
-        f"Your Goal: {agent.get('goal', '')}\n"
-        f"Your Plan: {agent.get('plan', '')}"
     )
     
     # Fetch the onchain prompt from PolicyManager
@@ -75,7 +65,7 @@ def load_system_prompt():
     
     # Append the onchain prompt if available
     if onchain_prompt.strip():
-        system_prompt = base_prompt + "\n\n" + "Additional Investment Policy from On-Chain Governance:\n" + onchain_prompt
+        system_prompt = base_prompt + "\n\n" + onchain_prompt
         logger.info("✅ Combined hardcoded system prompt with onchain policy")
     else:
         system_prompt = base_prompt
