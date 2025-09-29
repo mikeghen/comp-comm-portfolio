@@ -7,7 +7,7 @@
         "type": "address"
       }
     ],
-    "name": "faucet",
+    "name": "drip",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

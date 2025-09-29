@@ -227,7 +227,7 @@ function MessageInput({
       writeFaucet({
         address: faucetAddress,
         abi: FAUCET_ABI,
-        functionName: 'faucet',
+        functionName: 'drip',
         args: [faucetUsdcAddress],
       });
     } catch (error) {
