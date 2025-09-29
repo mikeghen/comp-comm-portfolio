@@ -55,6 +55,17 @@ flowchart TB
 
 You can find a sample agent prompt in the `backend/compound_assistant/config/agent.yaml` file.
 
+## PolicyManager Integration
+
+The assistant now integrates with the PolicyManager smart contract to dynamically load investment policies from on-chain. The system:
+
+- Fetches the current investment policy from the deployed PolicyManager contract
+- Appends the on-chain policy to the existing hardcoded system prompt
+- Gracefully falls back to hardcoded prompts if on-chain access is unavailable
+- Supports dynamic policy updates through on-chain governance
+
+See [docs/PolicyManager-Integration.md](docs/PolicyManager-Integration.md) for detailed information about configuration and usage.
+
 ## Requirements
 - Python 3.10+
 - Poetry for package management and tooling
