@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAccount } from 'wagmi';
-import { Container, Row, Col } from 'react-bootstrap';
+import { Container, Row, Col, Nav } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './bootstrap-overrides.css';
 
@@ -8,6 +8,7 @@ import './bootstrap-overrides.css';
 import Header from './components/layout/Header';
 import ChatContainer from './components/chat/ChatContainer';
 import AccountContainer from './components/account/AccountContainer';
+import PolicyView from './components/policy/PolicyView';
 
 // Define types for messages
 interface Message {
@@ -25,6 +26,7 @@ const App: React.FC = () => {
   const [input, setInput] = useState<string>('');
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'connecting' | 'disconnected'>('disconnected');
   const [isThinking, setIsThinking] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<'portfolio' | 'policy'>('portfolio');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
@@ -212,30 +214,50 @@ const App: React.FC = () => {
     <div className="d-flex flex-column min-vh-100">
       <Header />
 
+      {/* Navigation Tabs */}
+      <Container className="py-2">
+        <Nav variant="tabs" activeKey={activeTab} onSelect={(k) => setActiveTab(k as 'portfolio' | 'policy')}>
+          <Nav.Item>
+            <Nav.Link eventKey="portfolio">Portfolio Management</Nav.Link>
+          </Nav.Item>
+          <Nav.Item>
+            <Nav.Link eventKey="policy">Policy Viewer</Nav.Link>
+          </Nav.Item>
+        </Nav>
+      </Container>
+
       {/* Main Content */}
       <Container className="py-4 flex-grow-1">
-        <Row className="g-4">
-          {/* Chat Container */}
-          <Col lg={6}>
-            <ChatContainer 
-              isConnected={isConnected}
-              messages={messages}
-              messagesEndRef={messagesEndRef}
-              input={input}
-              setInput={setInput}
-              handleKeyDown={handleKeyDown}
-              sendMessage={sendMessage}
-              connectionStatus={connectionStatus}
-              isThinking={isThinking}
-              addUserMessage={addUserMessage}
-            />
-          </Col>
-          
-          {/* Account Overview */}
-          <Col lg={6}>
-            <AccountContainer />
-          </Col>
-        </Row>
+        {activeTab === 'portfolio' ? (
+          <Row className="g-4">
+            {/* Chat Container */}
+            <Col lg={6}>
+              <ChatContainer 
+                isConnected={isConnected}
+                messages={messages}
+                messagesEndRef={messagesEndRef}
+                input={input}
+                setInput={setInput}
+                handleKeyDown={handleKeyDown}
+                sendMessage={sendMessage}
+                connectionStatus={connectionStatus}
+                isThinking={isThinking}
+                addUserMessage={addUserMessage}
+              />
+            </Col>
+            
+            {/* Account Overview */}
+            <Col lg={6}>
+              <AccountContainer />
+            </Col>
+          </Row>
+        ) : (
+          <Row className="justify-content-center">
+            <Col xl={10}>
+              <PolicyView />
+            </Col>
+          </Row>
+        )}
       </Container>
     </div>
   );
