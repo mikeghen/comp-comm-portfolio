@@ -30,7 +30,7 @@ const PolicyGrid: React.FC<PolicyGridProps> = ({ text, maxLength }) => {
     <div 
       className="policy-grid" 
       style={{
-        fontFamily: 'monospace',
+        fontFamily: 'Courier New, monospace',
         fontSize: '11px',
         lineHeight: '1.2',
         backgroundColor: '#f8f9fa',
@@ -67,11 +67,11 @@ const PolicyView: React.FC = () => {
   if (!isConnected) {
     return (
       <Card>
-        <Card.Header className="d-flex justify-content-between align-items-center">
-          <h5 className="mb-0">Policy Viewer</h5>
-          <Badge bg="warning">Wallet Not Connected</Badge>
-        </Card.Header>
         <Card.Body>
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <h5 className="mb-0">Policy Viewer</h5>
+            <Badge bg="warning">Wallet Not Connected</Badge>
+          </div>
           <Alert variant="warning">
             Please connect your wallet to view the current policy.
           </Alert>
@@ -83,11 +83,11 @@ const PolicyView: React.FC = () => {
   if (!contractConnected) {
     return (
       <Card>
-        <Card.Header className="d-flex justify-content-between align-items-center">
-          <h5 className="mb-0">Policy Viewer</h5>
-          <Badge bg="danger">Unsupported Network</Badge>
-        </Card.Header>
         <Card.Body>
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <h5 className="mb-0">Policy Viewer</h5>
+            <Badge bg="danger">Unsupported Network</Badge>
+          </div>
           <Alert variant="danger">
             PolicyManager contract not available on {getNetworkName(chainId)}. 
             Please switch to Ethereum Sepolia to view the policy.
@@ -100,11 +100,11 @@ const PolicyView: React.FC = () => {
   if (isLoading) {
     return (
       <Card>
-        <Card.Header className="d-flex justify-content-between align-items-center">
-          <h5 className="mb-0">Policy Viewer</h5>
-          <Badge bg="info">Loading</Badge>
-        </Card.Header>
         <Card.Body className="text-center">
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <h5 className="mb-0">Policy Viewer</h5>
+            <Badge bg="info">Loading</Badge>
+          </div>
           <Spinner animation="border" role="status">
             <span className="visually-hidden">Loading policy...</span>
           </Spinner>
@@ -117,11 +117,11 @@ const PolicyView: React.FC = () => {
   if (isError) {
     return (
       <Card>
-        <Card.Header className="d-flex justify-content-between align-items-center">
-          <h5 className="mb-0">Policy Viewer</h5>
-          <Badge bg="danger">Error</Badge>
-        </Card.Header>
         <Card.Body>
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <h5 className="mb-0">Policy Viewer</h5>
+            <Badge bg="danger">Error</Badge>
+          </div>
           <Alert variant="danger">
             Failed to load policy from PolicyManager contract. Please check your connection and try again.
           </Alert>
@@ -132,23 +132,22 @@ const PolicyView: React.FC = () => {
 
   return (
     <Card>
-      <Card.Header className="d-flex justify-content-between align-items-center">
-        <h5 className="mb-0">Policy Viewer</h5>
-        <div className="d-flex gap-2">
-          <Badge bg="success">Read-Only</Badge>
-          <Badge bg="secondary">Version {promptVersion}</Badge>
-          <Badge bg="info">{getNetworkName(chainId)}</Badge>
-        </div>
-      </Card.Header>
       <Card.Body>
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h5 className="mb-0">Policy Viewer</h5>
+          <div className="d-flex gap-2">
+            <Badge bg="success">Read-Only</Badge>
+            <Badge bg="secondary">Version {promptVersion}</Badge>
+            <Badge bg="info">{getNetworkName(chainId)}</Badge>
+          </div>
+        </div>
+        
         <div className="mb-3">
           <p className="mb-2">
             <strong>Current Investment Policy</strong> - Viewing policy from PolicyManager contract
             <br />
             <small className="text-muted">
               Policy length: {promptText.length} / {maxPolicySize} characters
-              {' · '}
-              Grid display: 100 columns × 20 rows (2,000 character limit)
               {' · '}
               This is a read-only view
             </small>
@@ -162,8 +161,6 @@ const PolicyView: React.FC = () => {
             PolicyManager Address: <code>0x10E6e63337ea16F6EC5022A42fCeD95E74Fb3F1D</code>
             {' · '}
             Version: {promptVersion}
-            {' · '}
-            Read-only access - no editing or USDC approval required
           </small>
         </div>
       </Card.Body>
