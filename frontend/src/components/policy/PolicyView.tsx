@@ -27,29 +27,23 @@ const PolicyGrid: React.FC<PolicyGridProps> = ({ text, maxLength }) => {
   }
 
   return (
-    <div 
+    <pre 
       className="policy-grid" 
       style={{
-        fontFamily: 'Courier New, monospace',
+        fontFamily: 'Courier New, Courier, monospace',
         fontSize: '11px',
         lineHeight: '1.2',
         backgroundColor: '#f8f9fa',
         border: '2px solid #6c757d',
         padding: '8px',
         borderRadius: '4px',
-        overflow: 'hidden',
+        overflow: 'auto',
         whiteSpace: 'pre',
+        margin: 0,
       }}
     >
-      {rows.map((row, index) => (
-        <div key={index} style={{ 
-          borderBottom: index < rows.length - 1 ? '1px solid #e9ecef' : 'none',
-          paddingBottom: '1px'
-        }}>
-          {row}
-        </div>
-      ))}
-    </div>
+      {rows.join('\n')}
+    </pre>
   );
 };
 
