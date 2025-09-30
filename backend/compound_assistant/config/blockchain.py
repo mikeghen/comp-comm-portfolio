@@ -8,6 +8,7 @@ class BlockchainConfig:
     
     # Default values
     DEFAULT_MESSAGE_MANAGER_ADDRESS = "0xDa779e0Ed56140Bd700e3B891AD6e107E0Ef764D"
+    DEFAULT_POLICY_MANAGER_ADDRESS = "0x10e6e63337ea16f6ec5022a42fced95e74fb3f1d"
     DEFAULT_SEPOLIA_RPC = "wss://sepolia.infura.io/ws/v3/"
     
     @staticmethod
@@ -59,6 +60,18 @@ class BlockchainConfig:
         )
     
     @staticmethod
+    def get_policy_manager_address() -> str:
+        """Get the PolicyManager contract address.
+        
+        Returns:
+            Contract address for PolicyManager
+        """
+        return os.getenv(
+            "POLICY_MANAGER_CONTRACT_ADDRESS", 
+            BlockchainConfig.DEFAULT_POLICY_MANAGER_ADDRESS
+        )
+    
+    @staticmethod
     def get_event_poll_interval() -> float:
         """Get the event polling interval in seconds.
         
@@ -96,6 +109,7 @@ class BlockchainConfig:
         print("\n📋 Optional Environment Variables:")
         print("=" * 50)
         print(f"MESSAGE_MANAGER_CONTRACT_ADDRESS - Contract address (default: {BlockchainConfig.DEFAULT_MESSAGE_MANAGER_ADDRESS})")
+        print(f"POLICY_MANAGER_CONTRACT_ADDRESS  - Contract address (default: {BlockchainConfig.DEFAULT_POLICY_MANAGER_ADDRESS})")
         print("EVENT_POLL_INTERVAL      - Event polling interval in seconds (default: 2.0)")
         print("\n💡 Create a .env file in the backend directory with these variables.")
         print("   The agent account must be granted AGENT_ROLE on the MessageManager contract.")
