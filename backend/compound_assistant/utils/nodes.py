@@ -41,6 +41,7 @@ def call_agent(state: MessagesState, model, system_prompt):
             updated_prompt = system_prompt + "\n\n" + portfolio_context
         
         logger.debug("🔄 Injected fresh portfolio holdings into system prompt")
+        logger.info(f"📋 Full system prompt:\n{updated_prompt}")
         messages = [SystemMessage(content=updated_prompt)] + messages
     
     response = model.invoke(messages)
