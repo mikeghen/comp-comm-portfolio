@@ -8,6 +8,7 @@ from langgraph.graph import END, START, StateGraph, MessagesState
 from langgraph.checkpoint.memory import MemorySaver
 from compound_assistant.utils.nodes import call_agent, should_continue, create_tool_node
 from compound_assistant.utils.tools import get_tools
+from compound_assistant.utils.portfolio_balances import fetch_portfolio_balances, format_portfolio_holdings_context
 from compound_assistant.config.blockchain import BlockchainConfig
 from compound_assistant.blockchain.web3_client import Web3Client
 from compound_assistant.contracts.policy_manager import PolicyManagerContract
@@ -48,6 +49,7 @@ def fetch_onchain_prompt():
 def load_system_prompt():
     """
     Load the agent prompt and append the onchain policy from PolicyManager.
+    Injects current portfolio holdings before the onchain policy.
     """
     # Base hardcoded system prompt
     base_prompt = (
@@ -60,16 +62,24 @@ def load_system_prompt():
         "You have expert level skills writing Python code specifically for data analysis."
     )
     
+    # Fetch current portfolio balances and format as context
+    portfolio_balances = fetch_portfolio_balances()
+    portfolio_context = format_portfolio_holdings_context(portfolio_balances)
+    
     # Fetch the onchain prompt from PolicyManager
     onchain_prompt = fetch_onchain_prompt()
     
-    # Append the onchain prompt if available
+    # Build the complete system prompt:
+    # 1. Base prompt
+    # 2. Portfolio holdings context
+    # 3. Onchain policy (if available)
+    system_prompt = base_prompt + "\n\n" + portfolio_context
+    
     if onchain_prompt.strip():
-        system_prompt = base_prompt + "\n\n" + onchain_prompt
-        logger.info("✅ Combined hardcoded system prompt with onchain policy")
+        system_prompt = system_prompt + "\n\n" + onchain_prompt
+        logger.info("✅ Combined hardcoded system prompt with portfolio holdings and onchain policy")
     else:
-        system_prompt = base_prompt
-        logger.info("ℹ️ Using hardcoded system prompt only (no onchain policy available)")
+        logger.info("ℹ️ Using hardcoded system prompt with portfolio holdings (no onchain policy available)")
     
     return system_prompt
 
