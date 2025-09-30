@@ -22,6 +22,7 @@ export interface CompoundNetworkContracts {
     Faucet?: Address;
     MessageManager?: Address; // Placeholder for MessageManager contract
     ManagementToken?: Address; // ManagementToken contract
+    PolicyManager?: Address; // PolicyManager contract
 }
 
 // Chain ID constants for clarity
@@ -68,6 +69,7 @@ export const CompoundContracts: Record<number, CompoundNetworkContracts> = {
         Faucet: "0x68793eA49297eB75DFB4610B68e076D2A5c7646C", // Sepolia USDC Faucet
         MessageManager: "0xDa779e0Ed56140Bd700e3B891AD6e107E0Ef764D", // Sepolia MessageManager address
         ManagementToken: "0xEf4f63830E0528254579731C46D69aF74cC7d1ad", // Sepolia ManagementToken address
+        PolicyManager: "0x10E6e63337ea16F6EC5022A42fCeD95E74Fb3F1D", // Sepolia PolicyManager address
     }
 };
 
@@ -167,5 +169,6 @@ import ERC20_ABI from "./abi/ERC20.json";
 import COMET_ABI from "./abi/Comet.json";
 import MESSAGE_MANAGER_ABI from "./abi/MessageManager.json";
 import FAUCET_ABI from "./abi/Faucet.json";
+import POLICY_MANAGER_ABI from "./abi/PolicyManager.json";
 
-export { ERC20_ABI, COMET_ABI, MESSAGE_MANAGER_ABI, FAUCET_ABI };
+export { ERC20_ABI, COMET_ABI, MESSAGE_MANAGER_ABI, FAUCET_ABI, POLICY_MANAGER_ABI };

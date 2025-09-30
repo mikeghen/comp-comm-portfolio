@@ -8,6 +8,7 @@ import './bootstrap-overrides.css';
 import Header from './components/layout/Header';
 import ChatContainer from './components/chat/ChatContainer';
 import AccountContainer from './components/account/AccountContainer';
+import PolicyView from './components/policy/PolicyView';
 
 // Define types for messages
 interface Message {
@@ -25,6 +26,7 @@ const App: React.FC = () => {
   const [input, setInput] = useState<string>('');
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'connecting' | 'disconnected'>('disconnected');
   const [isThinking, setIsThinking] = useState<boolean>(false);
+  const [currentPage, setCurrentPage] = useState<'portfolio' | 'policy'>('portfolio');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
@@ -208,34 +210,46 @@ const App: React.FC = () => {
     }
   };
 
+  const handleNavigation = (page: 'portfolio' | 'policy') => {
+    setCurrentPage(page);
+  };
+
   return (
     <div className="d-flex flex-column min-vh-100">
-      <Header />
+      <Header currentPage={currentPage} onNavigate={handleNavigation} />
 
       {/* Main Content */}
       <Container className="py-4 flex-grow-1">
-        <Row className="g-4">
-          {/* Chat Container */}
-          <Col lg={6}>
-            <ChatContainer 
-              isConnected={isConnected}
-              messages={messages}
-              messagesEndRef={messagesEndRef}
-              input={input}
-              setInput={setInput}
-              handleKeyDown={handleKeyDown}
-              sendMessage={sendMessage}
-              connectionStatus={connectionStatus}
-              isThinking={isThinking}
-              addUserMessage={addUserMessage}
-            />
-          </Col>
-          
-          {/* Account Overview */}
-          <Col lg={6}>
-            <AccountContainer />
-          </Col>
-        </Row>
+        {currentPage === 'portfolio' ? (
+          <Row className="g-4">
+            {/* Chat Container */}
+            <Col lg={6}>
+              <ChatContainer 
+                isConnected={isConnected}
+                messages={messages}
+                messagesEndRef={messagesEndRef}
+                input={input}
+                setInput={setInput}
+                handleKeyDown={handleKeyDown}
+                sendMessage={sendMessage}
+                connectionStatus={connectionStatus}
+                isThinking={isThinking}
+                addUserMessage={addUserMessage}
+              />
+            </Col>
+            
+            {/* Account Overview */}
+            <Col lg={6}>
+              <AccountContainer />
+            </Col>
+          </Row>
+        ) : (
+          <Row className="justify-content-center">
+            <Col xl={10}>
+              <PolicyView />
+            </Col>
+          </Row>
+        )}
       </Container>
     </div>
   );
