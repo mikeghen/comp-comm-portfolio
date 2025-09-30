@@ -6,7 +6,9 @@ This is a community‑managed portfolio that doesn’t use token voting. Instead
 This is a template for developers looking to build an assistant that can interact with the Compound Finance on the blockchain. It consists of a backend server and a frontend client that can be run locally or deployed to the cloud. 
 
 ### Preview
-![Compound Assistant Preview](./preview.png)
+| Chat Preview | Policy Preview |
+| --- | --- |
+| ![Compound Assistant Chat Preview](./docs/images/chat_preview.png) | ![Compound Assistant Policy Preview](./docs/images/policy_preview.png) |
 
 ## System Architecture
 ![System Architecture](./docs/images/compcomm_arch.png)
