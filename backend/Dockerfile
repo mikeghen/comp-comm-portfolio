@@ -26,7 +26,7 @@ WORKDIR /app
 COPY pyproject.toml poetry.lock* ./
 
 # Install dependencies first (better caching)
-RUN poetry install --no-interaction --no-ansi --no-dev
+RUN poetry install
 
 # Copy the rest of the application
 COPY . .
