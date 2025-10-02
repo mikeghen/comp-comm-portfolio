@@ -48,6 +48,7 @@ def fetch_onchain_prompt():
 def load_system_prompt():
     """
     Load the agent prompt and append the onchain policy from PolicyManager.
+    Portfolio holdings will be injected separately at runtime for freshness.
     """
     # Base hardcoded system prompt
     base_prompt = (
@@ -63,7 +64,8 @@ def load_system_prompt():
     # Fetch the onchain prompt from PolicyManager
     onchain_prompt = fetch_onchain_prompt()
     
-    # Append the onchain prompt if available
+    # Build the system prompt without portfolio holdings
+    # (portfolio holdings will be injected fresh at each call in call_agent)
     if onchain_prompt.strip():
         system_prompt = base_prompt + "\n\n" + onchain_prompt
         logger.info("✅ Combined hardcoded system prompt with onchain policy")
