@@ -101,6 +101,11 @@ contract VaultManager is Ownable2Step, AccessControl, ReentrancyGuard, Pausable 
   event AllowedCometSet(address comet, bool allowed);
   event AgentSet(address agent);
   event AssetCometSet(address asset, address comet);
+  event UniswapV3Swap(
+    address executor, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut
+  );
+  event CompoundV3Deposit(address executor, address comet, address asset, uint256 amount);
+  event CompoundV3Withdraw(address executor, address comet, address asset, uint256 amount);
 
   // --------------------
   // Modifiers
@@ -187,6 +192,9 @@ contract VaultManager is Ownable2Step, AccessControl, ReentrancyGuard, Pausable 
     });
 
     amountOut = ISwapRouter(UNISWAP_V3_ROUTER).exactInputSingle(fwd);
+    emit UniswapV3Swap(
+      msg.sender, paramsIn.tokenIn, paramsIn.tokenOut, paramsIn.amountIn, amountOut
+    );
 
     emit SwapExecuted(paramsIn.tokenIn, paramsIn.tokenOut, paramsIn.amountIn, amountOut);
   }
@@ -209,7 +217,7 @@ contract VaultManager is Ownable2Step, AccessControl, ReentrancyGuard, Pausable 
 
     _approveIfNeeded(asset, comet, amount);
     IComet(comet).supply(asset, amount);
-
+    emit CompoundV3Deposit(msg.sender, comet, asset, amount);
     emit CometSupplied(comet, asset, amount);
   }
 
@@ -232,7 +240,7 @@ contract VaultManager is Ownable2Step, AccessControl, ReentrancyGuard, Pausable 
     if (!allowedComets[comet] || comet == address(0)) revert VaultManager__CometNotAllowed();
 
     IComet(comet).withdraw(asset, amount);
-
+    emit CompoundV3Withdraw(msg.sender, comet, asset, amount);
     emit CometWithdrawn(comet, asset, amount);
   }
 

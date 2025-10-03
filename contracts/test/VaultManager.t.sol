@@ -757,4 +757,41 @@ contract Pause is VaultManagerTest {
     // ---- Assert
     assertEq(weth.balanceOf(address(vault)), 2e6);
   }
+
+  function test_EmitsUniswapV3SwapEvent() public {
+    // ---- Arrange
+    uint256 amountIn = 2_000_000;
+    _fundVault(address(usdc), amountIn);
+
+    vm.expectEmit();
+    emit VaultManager.UniswapV3Swap(owner, address(usdc), address(weth), amountIn, amountIn * 2);
+
+    // ---- Act (event only)
+    _exactInputSingleAs(owner, address(usdc), address(weth), amountIn);
+  }
+
+  function test_EmitsCompoundV3DepositEvent() public {
+    // ---- Arrange
+    uint256 amount = 7e6;
+    _fundVault(address(usdc), amount);
+
+    vm.expectEmit();
+    emit VaultManager.CompoundV3Deposit(owner, address(comet), address(usdc), amount);
+
+    // ---- Act (event only)
+    _supplyAs(owner, address(usdc), amount);
+  }
+
+  function test_EmitsCompoundV3WithdrawEvent() public {
+    // ---- Arrange
+    uint256 amount = 4e6;
+    _fundVault(address(usdc), amount);
+    _supplyAs(owner, address(usdc), amount);
+
+    vm.expectEmit();
+    emit VaultManager.CompoundV3Withdraw(owner, address(comet), address(usdc), amount);
+
+    // ---- Act (event only)
+    _withdrawAs(owner, address(usdc), amount);
+  }
 }

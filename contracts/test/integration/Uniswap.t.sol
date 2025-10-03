@@ -95,7 +95,15 @@ contract UniswapIntegrationBase is Test {
 /// @notice Swap between USDC and WETH both directions
 contract Swap_USDC_WETH is UniswapIntegrationBase {
   function testFork_Swap_USDC_to_WETH() public {
+    vm.expectEmit();
+    emit VaultManager.UniswapV3Swap(address(this), address(USDC), address(WETH), 1000e6, 4.499e7);
     _swapAndAssert(USDC, WETH, 1000e6); // 1,000 USDC -> WETH
+  }
+  // the function in this contract only for testing purposes
+  function testFork_EmitsUniswapV3SwapEvent() public {
+    vm.expectEmit();
+    emit VaultManager.UniswapV3Swap(address(this), address(USDC), address(WETH), 1000e6, 4.499e7);
+    _swapAndAssert(USDC, WETH, 1000e6);
   }
 
   function testFork_Swap_WETH_to_USDC() public {
