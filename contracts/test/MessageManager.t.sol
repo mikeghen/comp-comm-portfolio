@@ -135,21 +135,30 @@ contract PayForMessage is MessageManagerTest {
     assertEq(mtToken.balanceOf(dev), devMint);
   }
 
-  function test_RevertIf_MessageAlreadyPaid() public {
+  function test_AllowsRepaymentOfSameMessage() public {
     // ---- Arrange
     string memory message = "duplicate message";
     uint256 price = messageManager.MESSAGE_PRICE_USDC();
     _mintUsdcTo(payer, price * 2);
     _approveUsdcFrom(payer, type(uint256).max);
 
+    uint256 userMint = messageManager.MT_PER_MESSAGE_USER();
+    uint256 devMint = (userMint * messageManager.DEV_BPS()) / 10_000;
+
     // Pay for message first time
     vm.prank(payer);
     messageManager.payForMessage(message);
 
-    // ---- Act & Assert - second payment should revert
-    vm.expectRevert(MessageManager.MessageManager__AlreadyPaid.selector);
+    // ---- Act - second payment should succeed
     vm.prank(payer);
     messageManager.payForMessage(message);
+
+    // ---- Assert
+    // Both payments should be recorded
+    assertEq(usdc.balanceOf(address(vault)), price * 2);
+    // Tokens minted twice (2x user mint + 2x dev mint)
+    assertEq(mtToken.balanceOf(payer), userMint * 2);
+    assertEq(mtToken.balanceOf(dev), devMint * 2);
   }
 
   function test_AllowsDifferentMessagesFromSamePayer() public {
@@ -188,18 +197,23 @@ contract PayForMessage is MessageManagerTest {
     _approveUsdcFrom(payer, type(uint256).max);
     _approveUsdcFrom(payer2, type(uint256).max);
 
+    uint256 userMint = messageManager.MT_PER_MESSAGE_USER();
+    uint256 devMint = (userMint * messageManager.DEV_BPS()) / 10_000;
+
     // ---- Act - first payer pays
     vm.prank(payer);
     messageManager.payForMessage(message);
 
-    // ---- Assert - second payer should revert (same message hash)
-    vm.expectRevert(MessageManager.MessageManager__AlreadyPaid.selector);
+    // ---- Act - second payer can also pay
     vm.prank(payer2);
     messageManager.payForMessage(message);
 
-    // Only first payer's payment should be recorded
+    // ---- Assert - both payments should be recorded
     assertEq(messageManager.paidMessages(messageHash), message);
-    assertEq(usdc.balanceOf(address(vault)), price); // Only one payment
+    assertEq(usdc.balanceOf(address(vault)), price * 2); // Both payments
+    assertEq(mtToken.balanceOf(payer), userMint); // First payer gets tokens
+    assertEq(mtToken.balanceOf(payer2), userMint); // Second payer gets tokens
+    assertEq(mtToken.balanceOf(dev), devMint * 2); // Dev gets tokens from both
   }
 
   function test_RevertIf_InsufficientUsdcBalance() public {
@@ -297,6 +311,41 @@ contract MarkMessageProcessed is MessageManagerTest {
     vm.prank(agent);
     vm.expectRevert(MessageManager.MessageManager__AlreadyProcessed.selector);
     messageManager.markMessageProcessed(messageHash);
+  }
+
+  function test_AllowsResendingAfterRepayment() public {
+    // ---- Arrange
+    string memory message = "resend me";
+    bytes32 messageHash = _computeMessageHash(message);
+    uint256 price = messageManager.MESSAGE_PRICE_USDC();
+
+    // Fund payer for two payments
+    _mintUsdcTo(payer, price * 2);
+    _approveUsdcFrom(payer, type(uint256).max);
+
+    // ---- Act - First send cycle
+    vm.prank(payer);
+    messageManager.payForMessage(message);
+
+    vm.prank(agent);
+    messageManager.markMessageProcessed(messageHash);
+
+    // ---- Assert - message is processed
+    assertTrue(messageManager.processedMessages(messageHash));
+
+    // ---- Act - Pay for the same message again
+    vm.prank(payer);
+    messageManager.payForMessage(message);
+
+    // ---- Assert - processed flag should be reset
+    assertFalse(messageManager.processedMessages(messageHash));
+
+    // ---- Act - Process the message again
+    vm.prank(agent);
+    messageManager.markMessageProcessed(messageHash);
+
+    // ---- Assert - message is processed again
+    assertTrue(messageManager.processedMessages(messageHash));
   }
 }
 

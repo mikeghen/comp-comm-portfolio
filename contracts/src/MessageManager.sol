@@ -10,9 +10,6 @@ import {ManagementToken} from "./ManagementToken.sol";
 /// @notice Handles USDC payments for AI agent messages and MT minting with replay protection.
 /// @dev Uses AccessControl for agent permissions.
 contract MessageManager is AccessControl, ReentrancyGuard {
-  /// @notice Thrown when a message has already been paid.
-  error MessageManager__AlreadyPaid();
-
   /// @notice Thrown when a message has already been processed.
   error MessageManager__AlreadyProcessed();
 
@@ -100,11 +97,11 @@ contract MessageManager is AccessControl, ReentrancyGuard {
     // Compute message hash
     bytes32 messageHash = keccak256(abi.encodePacked(message));
 
-    // Check if message has already been paid for
-    if (bytes(paidMessages[messageHash]).length > 0) revert MessageManager__AlreadyPaid();
-
     // Store message content with hash as key
     paidMessages[messageHash] = message;
+
+    // Reset processed status to allow resending
+    processedMessages[messageHash] = false;
 
     // Transfer fixed USDC price from payer to vault
     IERC20(USDC).transferFrom(msg.sender, VAULT, MESSAGE_PRICE_USDC);
