@@ -92,6 +92,7 @@ contract MessageManager is AccessControl, ReentrancyGuard {
   }
 
   /// @notice Pays for a message and mints MT to user and dev.
+  /// @dev Allows repayment of the same message, resetting processed status for resending.
   /// @param message The message content to pay for.
   function payForMessage(string calldata message) external nonReentrant {
     // Compute message hash
@@ -100,7 +101,8 @@ contract MessageManager is AccessControl, ReentrancyGuard {
     // Store message content with hash as key
     paidMessages[messageHash] = message;
 
-    // Reset processed status to allow resending
+    // Reset processed status to allow message to be processed (again)
+    // This enables the same message to be resent after repayment
     processedMessages[messageHash] = false;
 
     // Transfer fixed USDC price from payer to vault
