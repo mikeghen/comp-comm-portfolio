@@ -138,6 +138,7 @@ contract PayForMessage is MessageManagerTest {
   function test_AllowsRepaymentOfSameMessage() public {
     // ---- Arrange
     string memory message = "duplicate message";
+    bytes32 messageHash = _computeMessageHash(message);
     uint256 price = messageManager.MESSAGE_PRICE_USDC();
     _mintUsdcTo(payer, price * 2);
     _approveUsdcFrom(payer, type(uint256).max);
@@ -149,7 +150,11 @@ contract PayForMessage is MessageManagerTest {
     vm.prank(payer);
     messageManager.payForMessage(message);
 
-    // ---- Act - second payment should succeed
+    // Process the message
+    vm.prank(agent);
+    messageManager.markMessageProcessed(messageHash);
+
+    // ---- Act - second payment should succeed after processing
     vm.prank(payer);
     messageManager.payForMessage(message);
 
@@ -159,6 +164,23 @@ contract PayForMessage is MessageManagerTest {
     // Tokens minted twice (2x user mint + 2x dev mint)
     assertEq(mtToken.balanceOf(payer), userMint * 2);
     assertEq(mtToken.balanceOf(dev), devMint * 2);
+  }
+
+  function test_RevertIf_PayingForPendingMessage() public {
+    // ---- Arrange
+    string memory message = "pending message";
+    uint256 price = messageManager.MESSAGE_PRICE_USDC();
+    _mintUsdcTo(payer, price * 2);
+    _approveUsdcFrom(payer, type(uint256).max);
+
+    // Pay for message first time
+    vm.prank(payer);
+    messageManager.payForMessage(message);
+
+    // ---- Act & Assert - second payment should revert (message pending processing)
+    vm.expectRevert(MessageManager.MessageManager__PendingProcessing.selector);
+    vm.prank(payer);
+    messageManager.payForMessage(message);
   }
 
   function test_AllowsDifferentMessagesFromSamePayer() public {
@@ -185,7 +207,33 @@ contract PayForMessage is MessageManagerTest {
     assertEq(usdc.balanceOf(address(vault)), price * 2);
   }
 
-  function test_AllowsSameMessageFromDifferentPayers() public {
+  function test_RevertIf_MessagePendingProcessing() public {
+    // ---- Arrange
+    string memory message = "shared message";
+    bytes32 messageHash = _computeMessageHash(message);
+    address payer2 = makeAddr("Payer2");
+
+    uint256 price = messageManager.MESSAGE_PRICE_USDC();
+    _mintUsdcTo(payer, price);
+    _mintUsdcTo(payer2, price);
+    _approveUsdcFrom(payer, type(uint256).max);
+    _approveUsdcFrom(payer2, type(uint256).max);
+
+    // ---- Act - first payer pays
+    vm.prank(payer);
+    messageManager.payForMessage(message);
+
+    // ---- Assert - second payer should revert (message pending processing)
+    vm.expectRevert(MessageManager.MessageManager__PendingProcessing.selector);
+    vm.prank(payer2);
+    messageManager.payForMessage(message);
+
+    // Only first payer's payment should be recorded
+    assertEq(messageManager.paidMessages(messageHash), message);
+    assertEq(usdc.balanceOf(address(vault)), price); // Only one payment
+  }
+
+  function test_AllowsSameMessageFromDifferentPayersAfterProcessing() public {
     // ---- Arrange
     string memory message = "shared message";
     bytes32 messageHash = _computeMessageHash(message);
@@ -204,7 +252,11 @@ contract PayForMessage is MessageManagerTest {
     vm.prank(payer);
     messageManager.payForMessage(message);
 
-    // ---- Act - second payer can also pay
+    // Process the message
+    vm.prank(agent);
+    messageManager.markMessageProcessed(messageHash);
+
+    // ---- Act - second payer can now pay after message is processed
     vm.prank(payer2);
     messageManager.payForMessage(message);
 

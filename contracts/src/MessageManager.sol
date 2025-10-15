@@ -16,6 +16,9 @@ contract MessageManager is AccessControl, ReentrancyGuard {
   /// @notice Thrown when attempting to process an unpaid message.
   error MessageManager__NotPaid();
 
+  /// @notice Thrown when a message is pending processing (paid but not yet processed).
+  error MessageManager__PendingProcessing();
+
   /// @notice Thrown when an invalid constructor address is provided.
   error MessageManager__InvalidAddress();
 
@@ -92,17 +95,25 @@ contract MessageManager is AccessControl, ReentrancyGuard {
   }
 
   /// @notice Pays for a message and mints MT to user and dev.
-  /// @dev Allows repayment of the same message, resetting processed status for resending.
+  /// @dev Allows repayment of the same message only after it has been processed.
   /// @param message The message content to pay for.
   function payForMessage(string calldata message) external nonReentrant {
     // Compute message hash
     bytes32 messageHash = keccak256(abi.encodePacked(message));
 
+    // Check if message is already paid but not yet processed
+    bool isPaid = bytes(paidMessages[messageHash]).length > 0;
+    bool isProcessed = processedMessages[messageHash];
+
+    if (isPaid && !isProcessed) {
+      revert MessageManager__PendingProcessing();
+    }
+
     // Store message content with hash as key
     paidMessages[messageHash] = message;
 
     // Reset processed status to allow message to be processed (again)
-    // This enables the same message to be resent after repayment
+    // This enables the same message to be resent after it has been processed
     processedMessages[messageHash] = false;
 
     // Transfer fixed USDC price from payer to vault
