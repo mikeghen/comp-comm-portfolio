@@ -14,9 +14,12 @@ from compound_assistant.contracts.policy_manager import PolicyManagerContract
 
 logger = logging.getLogger(__name__)
 
-def fetch_onchain_prompt():
+def fetch_onchain_prompt(web3_client=None):
     """
     Fetch the agent prompt from the PolicyManager contract.
+    
+    Args:
+        web3_client: Optional Web3Client instance to reuse existing connection
     
     Returns:
         str: The onchain prompt text, or empty string if failed to fetch
@@ -28,8 +31,12 @@ def fetch_onchain_prompt():
             logger.warning("ETHEREUM_RPC_URL not set, skipping onchain prompt fetch")
             return ""
         
-        # Initialize Web3 client and PolicyManager contract
-        w3_client = Web3Client(rpc_url)
+        # Use provided Web3 client or create a new one if not provided
+        if web3_client is None:
+            w3_client = Web3Client(rpc_url)
+        else:
+            w3_client = web3_client
+            
         policy_manager_address = BlockchainConfig.get_policy_manager_address()
         policy_manager = PolicyManagerContract(w3_client.get_web3(), policy_manager_address)
         
@@ -45,9 +52,12 @@ def fetch_onchain_prompt():
         logger.warning("Continuing with hardcoded system prompt only")
         return ""
 
-def load_system_prompt():
+def load_system_prompt(web3_client=None):
     """
     Load the agent prompt and append the onchain policy from PolicyManager.
+    
+    Args:
+        web3_client: Optional Web3Client instance to reuse existing connection
     """
     # Base hardcoded system prompt
     base_prompt = (
@@ -61,7 +71,7 @@ def load_system_prompt():
     )
     
     # Fetch the onchain prompt from PolicyManager
-    onchain_prompt = fetch_onchain_prompt()
+    onchain_prompt = fetch_onchain_prompt(web3_client)
     
     # Append the onchain prompt if available
     if onchain_prompt.strip():
@@ -73,9 +83,13 @@ def load_system_prompt():
     
     return system_prompt
 
-def create_agent(model_name="gpt-4o-mini"):
+def create_agent(model_name="gpt-4o-mini", web3_client=None):
     """
     Create and return the compiled agent graph.
+    
+    Args:
+        model_name: Name of the LLM model to use
+        web3_client: Optional Web3Client instance to reuse existing connection
     """
     # Get tools from AgentKit
     tools = get_tools()
@@ -85,7 +99,7 @@ def create_agent(model_name="gpt-4o-mini"):
     model = llm.bind_tools(tools)
     
     # Load system prompt
-    system_prompt = load_system_prompt()
+    system_prompt = load_system_prompt(web3_client)
     
     # Create a tool node
     tool_node = create_tool_node(tools)

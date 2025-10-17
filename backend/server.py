@@ -68,16 +68,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Create the agent
-print("🚀 Starting Compound Assistant server...")
-print("📡 Creating agent and loading tools...")
-agent = create_agent()
-print("✅ Agent created successfully!")
-
-# Thread ID for persistence
-THREAD_ID = "Compound Assistant"
-
-# Initialize blockchain components
+# Initialize blockchain components first
 print("🔗 Initializing blockchain connections...")
 
 # Validate blockchain configuration
@@ -94,6 +85,15 @@ except Exception as e:
     print(f"❌ Failed to initialize Web3 client: {e}")
     BlockchainConfig.print_config_requirements()
     sys.exit(1)
+
+# Create the agent with the existing Web3 client
+print("🚀 Starting Compound Assistant server...")
+print("📡 Creating agent and loading tools...")
+agent = create_agent(web3_client=web3_client)
+print("✅ Agent created successfully!")
+
+# Thread ID for persistence
+THREAD_ID = "Compound Assistant"
 
 # Initialize event listener
 try:
